@@ -1,6 +1,7 @@
 
 
-export default function Page() {
+
+export default function LoginPage() {
     return (
         <div>
             login page

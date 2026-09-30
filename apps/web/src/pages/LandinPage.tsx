@@ -1,6 +1,5 @@
-"use client";
-import Link from "next/link";
-import Skiper from "./components/Skiper";
+import Skiper from "../components/Skipper";
+import { Link } from "react-router-dom";
 import styles from "./page.module.css";
 
 export default function LandingPage() {
@@ -8,21 +7,18 @@ export default function LandingPage() {
     <main style={{ height: "100%", width: "100%", overflow: "hidden" }}>
       <Skiper>
         <div className={styles.heroOverlay}>
-          {/* Main Heading */}
           <h1 className={styles.mainHeading}>
             Your social world, reimagined in the{" "}
             <span className={styles.alterverseHighlight}>alterverse</span>
           </h1>
 
-          {/* Sub-description */}
           <p className={styles.subDescription}>
             A game-like virtual space to hang out, play, and talk with friends in real-time.
           </p>
 
-          {/* CTA Buttons */}
           <div className={styles.ctaGroup}>
             <Link
-              href="/register"
+              to="/register"
               className={styles.primaryButton}
               style={{ color: "#ffffff", textDecoration: "none" }}
             >
@@ -44,7 +40,7 @@ export default function LandingPage() {
             </Link>
 
             <Link
-              href="/space"
+              to="/space"
               className={styles.secondaryButton}
               style={{ color: "#0f172a", textDecoration: "none" }}
             >
