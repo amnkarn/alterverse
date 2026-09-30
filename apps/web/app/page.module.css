@@ -184,3 +184,196 @@ button.secondary {
     filter: invert();
   }
 }
+
+/* ==========================================================================
+   Hero Overlay & Typography
+   ========================================================================== */
+
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: clamp(54px, 12vh, 120px);
+  padding-left: 20px;
+  padding-right: 20px;
+  text-align: center;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.eyebrowBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.03);
+  margin-bottom: 22px;
+}
+
+.eyebrowDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.65);
+}
+
+.eyebrowText {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #334155;
+  user-select: none;
+}
+
+.mainHeading {
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 850;
+  font-size: clamp(2.35rem, 5.2vw, 4.35rem);
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+  color: #0b111e;
+  width: 100%;
+  max-width: 1060px;
+  margin: 0 auto 20px auto;
+  text-wrap: balance;
+}
+
+.alterverseHighlight {
+  display: inline-block;
+  color: #0b111e;
+  position: relative;
+}
+
+.subDescription {
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 450;
+  font-size: clamp(1.05rem, 1.8vw, 1.25rem);
+  line-height: 1.6;
+  letter-spacing: -0.015em;
+  color: #334155;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto 36px auto;
+  text-wrap: balance;
+}
+
+.ctaGroup {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  pointer-events: auto;
+}
+
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 750;
+  font-size: 1.05rem;
+  letter-spacing: -0.015em;
+  color: #ffffff !important;
+  background-color: #090d16;
+  padding: 15px 36px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 4px 18px rgba(9, 13, 22, 0.22), 0 1px 2px rgba(9, 13, 22, 0.12);
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.primaryButton span,
+.primaryButton svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.primaryButton:hover {
+  background-color: #000000;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(9, 13, 22, 0.32), 0 2px 4px rgba(9, 13, 22, 0.14);
+}
+
+.primaryButton:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.arrowIcon {
+  width: 17px;
+  height: 17px;
+  stroke: #ffffff !important;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.primaryButton:hover .arrowIcon {
+  transform: translateX(4px);
+}
+
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 650;
+  font-size: 1.02rem;
+  letter-spacing: -0.015em;
+  color: #0f172a !important;
+  background: rgba(255, 255, 255, 0.88);
+  padding: 15px 28px;
+  border-radius: 9999px;
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.secondaryButton span {
+  color: #0f172a !important;
+}
+
+.secondaryButton:hover {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.09);
+}
+
+.secondaryButton:active {
+  transform: translateY(0) scale(0.97);
+}
+
+@media (max-width: 640px) {
+  .heroOverlay {
+    padding-top: 48px;
+  }
+
+  .ctaGroup {
+    flex-direction: column;
+    width: 100%;
+    max-width: 320px;
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    width: 100%;
+  }
+}

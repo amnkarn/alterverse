@@ -8,8 +8,11 @@ interface CrowdCanvasProps {
     cols?: number;
 }
 
+const HOVER_RADIUS = 180;
+
 const CrowdCanvas = ({ src, rows = 15, cols = 7 }: CrowdCanvasProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const mouseRef = useRef({ x: -9999, y: -9999 });
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -39,6 +42,7 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7 }: CrowdCanvasProps) => {
             y: number;
             anchorY: number;
             scaleX: number;
+            baseTimeScale: number;
             walk: gsap.core.Timeline | null;
             setRect: (rect: number[]) => void;
             render: (ctx: CanvasRenderingContext2D) => void;
@@ -69,13 +73,15 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7 }: CrowdCanvasProps) => {
             return { startX, startY, endX };
         };
 
-        const normalWalk = ({ peep, props }: { peep: Peep; props: ReturnType<typeof resetPeep> }) => {
-            const { startY, endX } = props;
+        const normalWalk = ({ peep, tweenProps }: { peep: Peep; tweenProps: ReturnType<typeof resetPeep> }) => {
+            const { startY, endX } = tweenProps;
             const xDuration = 10;
             const yDuration = 0.25;
+            const base = randomRange(0.5, 1.5);
+            peep.baseTimeScale = base;
 
             const tl = gsap.timeline();
-            tl.timeScale(randomRange(0.5, 1.5));
+            tl.timeScale(base);
             tl.to(peep, { duration: xDuration, x: endX, ease: "none" }, 0);
             tl.to(peep, { duration: yDuration, repeat: xDuration / yDuration, yoyo: true, y: startY - 10 }, 0);
 
@@ -95,6 +101,7 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7 }: CrowdCanvasProps) => {
                 y: 0,
                 anchorY: 0,
                 scaleX: 1,
+                baseTimeScale: 1,
                 walk: null,
                 setRect: (r: number[]) => {
                     peep.rect = r;
@@ -105,7 +112,13 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7 }: CrowdCanvasProps) => {
                     ctx.save();
                     ctx.translate(peep.x, peep.y);
                     ctx.scale(peep.scaleX, 1);
-                    ctx.drawImage(peep.image, peep.rect[0]!, peep.rect[1]!, peep.rect[2]!, peep.rect[3]!, 0, 0, peep.width, peep.height);
+                    ctx.drawImage(
+                        peep.image,
+                        peep.rect[0]!, peep.rect[1]!,
+                        peep.rect[2]!, peep.rect[3]!,
+                        0, 0,
+                        peep.width, peep.height,
+                    );
                     ctx.restore();
                 },
             };
@@ -115,7 +128,6 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7 }: CrowdCanvasProps) => {
 
         // MAIN
         const img = document.createElement("img");
-
         const stage = { width: 0, height: 0 };
         const allPeeps: Peep[] = [];
         const availablePeeps: Peep[] = [];
@@ -150,7 +162,7 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7 }: CrowdCanvasProps) => {
             const peep = removeRandomFromArray(availablePeeps);
             const walk = getRandomFromArray(walks)({
                 peep,
-                props: resetPeep({ peep, stage }),
+                tweenProps: resetPeep({ peep, stage }),
             }).eventCallback("onComplete", () => {
                 removePeepFromCrowd(peep);
                 addPeepToCrowd();
@@ -168,16 +180,59 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7 }: CrowdCanvasProps) => {
             }
         };
 
+        const drawCursorAura = () => {
+            const mx = mouseRef.current.x;
+            const my = mouseRef.current.y;
+            if (mx < 0) return;
+
+            const gradient = ctx.createRadialGradient(mx, my, 0, mx, my, HOVER_RADIUS);
+            gradient.addColorStop(0,   "rgba(255, 255, 255, 0.35)");
+            gradient.addColorStop(0.5, "rgba(255, 255, 255, 0.12)");
+            gradient.addColorStop(1,   "rgba(255, 255, 255, 0)");
+
+            ctx.save();
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(mx, my, HOVER_RADIUS, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        };
+
         const render = () => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.save();
             ctx.scale(devicePixelRatio, devicePixelRatio);
-            crowd.forEach((peep) => peep.render(ctx));
+
+            // Cursor aura drawn beneath characters
+            drawCursorAura();
+
+            crowd.forEach((peep) => {
+                const cx = peep.x + peep.width / 2;
+                const cy = peep.y + peep.height / 2;
+                const dx = cx - mouseRef.current.x;
+                const dy = cy - mouseRef.current.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                const cur = peep.walk?.timeScale() ?? peep.baseTimeScale;
+
+                if (dist < HOVER_RADIUS) {
+                    // Slow to 50% of base speed smoothly — still clearly walking, not stopping
+                    const target = peep.baseTimeScale * 0.5;
+                    peep.walk?.timeScale(cur + (target - cur) * 0.1);
+                } else if (cur < peep.baseTimeScale) {
+                    // Lerp back to full speed when out of range
+                    peep.walk?.timeScale(
+                        Math.min(peep.baseTimeScale, cur + (peep.baseTimeScale - cur) * 0.06)
+                    );
+                }
+
+                peep.render(ctx);
+            });
+
             ctx.restore();
         };
 
         const resize = () => {
-            // Use window dimensions directly — reliable regardless of CSS height chain
             stage.width = window.innerWidth;
             stage.height = window.innerHeight;
             canvas.width = stage.width * devicePixelRatio;
@@ -201,11 +256,22 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7 }: CrowdCanvasProps) => {
         img.onload = init;
         img.src = src;
 
-        const handleResize = () => resize();
-        window.addEventListener("resize", handleResize);
+        const onResize = () => resize();
+        const onMouseMove = (e: MouseEvent) => {
+            mouseRef.current = { x: e.clientX, y: e.clientY };
+        };
+        const onMouseLeave = () => {
+            mouseRef.current = { x: -9999, y: -9999 };
+        };
+
+        window.addEventListener("resize", onResize);
+        window.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseleave", onMouseLeave);
 
         return () => {
-            window.removeEventListener("resize", handleResize);
+            window.removeEventListener("resize", onResize);
+            window.removeEventListener("mousemove", onMouseMove);
+            document.removeEventListener("mouseleave", onMouseLeave);
             gsap.ticker.remove(render);
             crowd.forEach((peep) => peep.walk?.kill());
             img.onload = null;
@@ -215,14 +281,180 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7 }: CrowdCanvasProps) => {
     return <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, display: "block" }} />;
 };
 
-const Skiper = () => {
+type PaletteKey = "mist" | "sage" | "sand" | "slate";
+
+interface ThemeOption {
+    id: PaletteKey;
+    label: string;
+    bgGradient: string;
+    dotColor: string;
+    lineColor: string;
+    vignetteColor: string;
+    colorSwatch: string;
+}
+
+const PALETTES: ThemeOption[] = [
+    {
+        id: "mist",
+        label: "Nordic Mist",
+        bgGradient: "linear-gradient(180deg, #e3ecf4 0%, #d4e1ed 45%, #b9ccde 100%)",
+        dotColor: "rgba(15, 30, 50, 0.05)",
+        lineColor: "rgba(15, 30, 50, 0.09)",
+        vignetteColor: "rgba(15, 30, 50, 0.04)",
+        colorSwatch: "#8bb1d4",
+    },
+    {
+        id: "sage",
+        label: "Celadon Sage",
+        bgGradient: "linear-gradient(180deg, #e4ede4 0%, #d6e3d6 45%, #b9cdb9 100%)",
+        dotColor: "rgba(20, 45, 25, 0.05)",
+        lineColor: "rgba(20, 45, 25, 0.09)",
+        vignetteColor: "rgba(20, 45, 25, 0.04)",
+        colorSwatch: "#88b38a",
+    },
+    {
+        id: "sand",
+        label: "Warm Sand",
+        bgGradient: "linear-gradient(180deg, #f1eae0 0%, #e6ddce 45%, #d1c3af 100%)",
+        dotColor: "rgba(55, 40, 20, 0.05)",
+        lineColor: "rgba(55, 40, 20, 0.09)",
+        vignetteColor: "rgba(55, 40, 20, 0.04)",
+        colorSwatch: "#c4ae8f",
+    },
+    {
+        id: "slate",
+        label: "Studio Slate",
+        bgGradient: "linear-gradient(180deg, #e3e7ec 0%, #d3d9e0 45%, #bac3ce 100%)",
+        dotColor: "rgba(30, 35, 45, 0.05)",
+        lineColor: "rgba(30, 35, 45, 0.09)",
+        vignetteColor: "rgba(30, 35, 45, 0.04)",
+        colorSwatch: "#919fb1",
+    },
+];
+
+interface SkiperProps {
+    children?: React.ReactNode;
+}
+
+const Skiper = ({ children }: SkiperProps) => {
+    const [selectedTheme, setSelectedTheme] = React.useState<PaletteKey>("mist");
+    const activePalette = PALETTES.find((p) => p.id === selectedTheme) || PALETTES[0]!;
+
     return (
-        <div style={{ position: "fixed", inset: 0, background: "white", overflow: "hidden" }}>
+        <div style={{
+            position: "fixed",
+            inset: 0,
+            overflow: "hidden",
+            background: activePalette.bgGradient,
+            transition: "background 0.6s ease",
+        }}>
+            {/* Subtle architectural dot grid pattern */}
+            <div style={{
+                position: "absolute",
+                inset: 0,
+                backgroundImage: `radial-gradient(circle at 1px 1px, ${activePalette.dotColor} 1px, transparent 0)`,
+                backgroundSize: "32px 32px",
+                pointerEvents: "none",
+                transition: "background-image 0.6s ease",
+            }} />
+
+            {/* Top diffuse studio light */}
+            <div style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: "50%",
+                background: "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255, 255, 255, 0.6) 0%, transparent 100%)",
+                pointerEvents: "none",
+            }} />
+
+            {/* Clean minimal horizon baseline for avatars */}
+            <div style={{
+                position: "absolute",
+                bottom: "70px",
+                left: 0,
+                right: 0,
+                height: "1px",
+                background: `linear-gradient(90deg, transparent 0%, ${activePalette.lineColor} 15%, ${activePalette.lineColor} 85%, transparent 100%)`,
+                pointerEvents: "none",
+                transition: "background 0.6s ease",
+            }} />
+
+            {/* Soft subtle ground vignette */}
+            <div style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: "220px",
+                background: `linear-gradient(to top, ${activePalette.vignetteColor} 0%, transparent 100%)`,
+                pointerEvents: "none",
+                transition: "background 0.6s ease",
+            }} />
+
+            {/* Avatar crowd canvas */}
             <CrowdCanvas
                 src="https://cdn.21st.dev/assets/localized/abdb8990a7bef8c2f5af3e45f0a3c969c4b0603fba8be92e81347de4ea4e1ed7.png"
                 rows={15}
                 cols={7}
             />
+
+            {/* Foreground content / Hero overlay */}
+            {children}
+
+            {/* Discreet, elegant theme palette switcher */}
+            <div style={{
+                position: "absolute",
+                top: "20px",
+                right: "24px",
+                zIndex: 40,
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "6px 12px",
+                borderRadius: "9999px",
+                backgroundColor: "rgba(255, 255, 255, 0.45)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                border: "1px solid rgba(255, 255, 255, 0.6)",
+                boxShadow: "0 2px 10px rgba(0, 0, 0, 0.04)",
+            }}>
+                <span style={{
+                    fontSize: "11px",
+                    fontWeight: 500,
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                    color: "rgba(15, 23, 42, 0.55)",
+                    marginRight: "2px",
+                    userSelect: "none",
+                }}>
+                    Theme
+                </span>
+                {PALETTES.map((palette) => {
+                    const isActive = palette.id === selectedTheme;
+                    return (
+                        <button
+                            key={palette.id}
+                            type="button"
+                            title={palette.label}
+                            onClick={() => setSelectedTheme(palette.id)}
+                            style={{
+                                width: "18px",
+                                height: "18px",
+                                borderRadius: "50%",
+                                backgroundColor: palette.colorSwatch,
+                                border: isActive ? "2px solid #0f172a" : "2px solid transparent",
+                                outline: "none",
+                                cursor: "pointer",
+                                transform: isActive ? "scale(1.15)" : "scale(1)",
+                                transition: "all 0.2s ease",
+                                boxShadow: isActive ? "0 1px 4px rgba(0,0,0,0.18)" : "none",
+                            }}
+                        />
+                    );
+                })}
+            </div>
         </div>
     );
 };
