@@ -8,19 +8,20 @@
     "build": "tsc -b"
   },
   "exports": {
-    "./client": "./dist/index.js"
+    "./client": "./index.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@repo/typescript-config": "workspace:*",
+    "@repo/typescript-config": "*",
     "dotenv": "^17.4.2",
     "prisma": "^7.8.0"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@types/node": "^26.6.3",
     "pg": "^8.21.0"
   }
 }

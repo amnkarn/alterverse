@@ -9,8 +9,8 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.get("/", async (req, res) => {
-    res.send("hi from backend");
+app.get("/health", async (req, res) => {
+    res.json({ message: "alive", status: 200 });
 })
 
 app.use("/api/v1", indexRouter);

@@ -11,8 +11,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@repo/db": "workspace:*",
-    "@repo/typescript-config": "workspace:*",
+    "@repo/db": "*",
+    "@repo/typescript-config": "*",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/ws": "^8.18.1",
     "dotenv": "^17.4.2",
