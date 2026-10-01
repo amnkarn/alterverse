@@ -18,7 +18,7 @@ app.get("/health", async (req, res) => {
     res.json({ message: "alive", status: 200 });
 })
 
-app.all("/api/auth/*", (req, res, next) => {
+app.all("/api/auth/*auth", (req, res, next) => {
     toNodeHandler(auth)(req as any, res as any).catch(next);
 })
 app.use("/api/v1", indexRouter);
