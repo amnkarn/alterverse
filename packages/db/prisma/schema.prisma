@@ -8,19 +8,62 @@ datasource db {
 }
 
 model User {
-  id            String  @id @unique @default(uuid())
+  id                    String  @id @unique @default(uuid())
+  name                  String?    // for Better Auth
+  email                 String    @unique
+  emailVerified         Boolean   @default(false)
+  image                 String?   // for github profile
 
-  name          String?    // for Better Auth
-  email         String    @unique
-  emailVerified Boolean   @default(false)
-  image         String?   // for github profile
+  password              String?
+  role                  Role    @default(User)
 
-  password      String?
-  role          Role    @default(User)
+  spaces                Space[]
+  avatarId              String?
+  avatar                Avatar?  @relation(fields: [avatarId], references: [id])
 
-  spaces        Space[]
-  avatarId      String?
-  avatar        Avatar?  @relation(fields: [avatarId], references: [id])
+  sessions              Session[]
+  accounts              Account[]
+}
+
+// necessary table for Better Auth
+model Session {
+  id                    String   @id @unique @default(uuid())
+  expiresAt             DateTime
+  token                 String   @unique
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  ipAddress             String?
+  userAgent             String?
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// necessary table for Better Auth
+model Account {
+  id                    String    @id @unique @default(uuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+// necessary table for Better Auth
+model Verification {
+  id                    String    @id @unique @default(uuid())
+  identifier            String
+  value                 String
+  expiresAt             DateTime
+  createdAt             DateTime? @default(now())
+  updatedAt             DateTime? @updatedAt
 }
 
 enum Role {
@@ -29,59 +72,59 @@ enum Role {
 }
 
 model Space {
-  id            String  @id @unique @default(uuid())
-  name          String
-  width         Int
-  height        Int
-  thumbnnail    String?
-  createrId     String
-  creater       User    @relation(fields: [createrId], references: [id])
-  elements      SpaceElement[]
+  id                    String  @id @unique @default(uuid())
+  name                  String
+  width                 Int
+  height                Int
+  thumbnnail            String?
+  createrId             String
+  creater               User    @relation(fields: [createrId], references: [id])
+  elements              SpaceElement[]
 }
 
 model Avatar {
-  id            String  @id  @unique @default(uuid())
-  imageUrl      String?
-  name          String?
-  users         User[]
+  id                    String  @id  @unique @default(uuid())
+  imageUrl              String?
+  name                  String?
+  users                 User[]
 }
 
 model SpaceElement {
-  id            String  @id  @unique @default(uuid())
-  elementId     String
-  element       Element @relation(fields: [elementId], references: [id])
-  x             Int
-  y             Int
-  spaceId       String
-  space         Space   @relation(fields: [spaceId], references: [id])
+  id                    String  @id  @unique @default(uuid())
+  elementId             String
+  element               Element @relation(fields: [elementId], references: [id])
+  x                     Int
+  y                     Int
+  spaceId               String
+  space                 Space   @relation(fields: [spaceId], references: [id])
 }
 
 model Element {
-  id            String  @id @unique @default(uuid())
-  width         Int
-  height        Int
-  static        Boolean
-  imageUrl      String
+  id                    String  @id @unique @default(uuid())
+  width                 Int
+  height                Int
+  static                Boolean
+  imageUrl              String
 
-  spaces        SpaceElement[]
-  mapElements   MapElements[]
+  spaces                SpaceElement[]
+  mapElements           MapElements[]
 }
 
 model Map {
-  id            String  @id @unique @default(uuid())
-  width         Int
-  height        Int
-  name          String
-  thumbnail     String
-  mapElements   MapElements[]
+  id                    String  @id @unique @default(uuid())
+  width                 Int
+  height                Int
+  name                  String
+  thumbnail             String
+  mapElements           MapElements[]
 }
 
 model MapElements {
-  id          String  @id @unique @default(uuid())
-  elementsId  String
-  elements    Element @relation(fields: [elementsId], references: [id])
-  x           Int?
-  y           Int?
-  mapId       String
-  map         Map     @relation(fields: [mapId], references: [id])
+  id                    String  @id @unique @default(uuid())
+  elementsId            String
+  elements              Element @relation(fields: [elementsId], references: [id])
+  x                     Int?
+  y                     Int?
+  mapId                 String
+  map                   Map     @relation(fields: [mapId], references: [id])
 }
