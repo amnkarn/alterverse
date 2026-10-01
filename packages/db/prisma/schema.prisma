@@ -9,9 +9,15 @@ datasource db {
 
 model User {
   id            String  @id @unique @default(uuid())
-  username      String  @unique
-  password      String
+
+  name          String?    // for Better Auth
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?   // for github profile
+
+  password      String?
   role          Role    @default(User)
+
   spaces        Space[]
   avatarId      String?
   avatar        Avatar?  @relation(fields: [avatarId], references: [id])

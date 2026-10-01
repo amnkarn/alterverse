@@ -4,6 +4,8 @@ import bcrypt from "bcrypt";
 import { prismaClient } from "@repo/db/client";
 import generateToken from "../utils/generateToken.js";
 
+//manually auth
+
 export async function signup(req: Request, res: Response) {
     const parsedData = SignupSchema.safeParse(req.body);
     if(!parsedData.success) {

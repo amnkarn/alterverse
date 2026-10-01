@@ -1,0 +1,7 @@
+import { createAuthClient } from "better-auth/client";
+
+export const authClient = createAuthClient({
+    baseURL: "http://localhost:8080"
+});
+
+export const { signIn, signOut, useSession } = authClient;
