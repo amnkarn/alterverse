@@ -4,7 +4,7 @@ import { ArrowLeft, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { signin, signup, type SignInPayload, type SignUpPayload } from "../api/auth.api";
 import GithubIcon from "../assets/icons/Github";
-import { signIn } from "../lib/auth";
+import { signIn } from "../lib/auth-client";
 
 type ClassValue = string | false | null | undefined;
 
@@ -392,7 +392,7 @@ export default function AuthPage({ signInContent = {}, signUpContent = {} }: Aut
     const currentContent = isSignIn ? finalSignInContent : finalSignUpContent;
 
     if(loading) {
-        console.log(loading);
+        //console.log(loading);
     }
 
     return (

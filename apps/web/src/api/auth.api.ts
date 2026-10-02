@@ -1,4 +1,4 @@
-import { authClient } from "../lib/auth";
+import { authClient } from "../lib/auth-client";
 
 export interface SignInPayload {
     email?: string;
@@ -31,7 +31,6 @@ const BACKEND_URL = "http://localhost:8080";
 export async function signin(payload: SignInPayload): Promise<AuthResponse> {
     const identifier = payload.email || payload.username || "";
     
-    // 1. Try better-auth client first if email format is provided
     try {
         if (identifier.includes("@")) {
             const res = await authClient.signIn.email({
@@ -46,7 +45,7 @@ export async function signin(payload: SignInPayload): Promise<AuthResponse> {
         // Fallback to manual API
     }
 
-    // 2. Direct REST fallback to backend /api/v1/signin or better-auth endpoint
+    // Direct REST fallback to backend /api/v1/signin or better-auth endpoint
     const response = await fetch(`${BACKEND_URL}/api/v1/signin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
