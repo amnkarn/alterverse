@@ -19,7 +19,9 @@ app.get("/health", async (req, res) => {
 })
 
 app.all("/api/auth/*auth", (req, res, next) => {
+    console.log("auth route trigggered");
     toNodeHandler(auth)(req as any, res as any).catch(next);
+    console.log("auth route trigggered 2");
 })
 app.use("/api/v1", indexRouter);
 
