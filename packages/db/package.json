@@ -19,7 +19,7 @@
     "prisma": "^7.8.0"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/adapter-neon": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@types/node": "^26.6.3",
     "pg": "^8.21.0"

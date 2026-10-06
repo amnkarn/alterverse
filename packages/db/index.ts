@@ -1,5 +1,5 @@
 import { PrismaClient } from "./generated/prisma/client.js";
-import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaNeon } from "@prisma/adapter-neon";
 import dotenv from "dotenv";
 import { fileURLToPath } from "node:url";
 
@@ -10,7 +10,7 @@ if (!connectionString || connectionString === "undefined") {
     throw new Error("connection string is required");
 }
 
-const adapter = new PrismaPg({ connectionString });
+const adapter = new PrismaNeon({ connectionString });
 
 const prismaClientSingleton = () => {
   return new PrismaClient({ adapter });

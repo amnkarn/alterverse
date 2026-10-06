@@ -379,7 +379,9 @@ export default function AuthPage({ signInContent = {}, signUpContent = {} }: Aut
             setLoading(true);
             await signIn.social({
                 provider: "github",
-                callbackURL: "/"
+                // The OAuth callback is handled by the backend, but the final
+                // redirect must return the user to the frontend.
+                callbackURL: "http://localhost:5173/"
             })
         } catch (error) {
             console.log(error);
