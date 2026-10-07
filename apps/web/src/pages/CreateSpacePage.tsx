@@ -6,6 +6,7 @@ import {
     ArrowLeft
 } from "lucide-react";
 
+// User can create space using an existing "Map"
 export default function CreateSpacePage() {
     const { data: session } = useSession();
     const navigate = useNavigate();

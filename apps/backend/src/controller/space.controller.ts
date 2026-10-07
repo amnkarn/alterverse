@@ -12,24 +12,6 @@ export const createSpace = async (req: Request, res: Response) => {
     }
 
     try {
-        let spaceId;
-
-        if (!parsedData.data.mapId) {
-            const space = await prismaClient.space.create({
-                data: {
-                    name: parsedData.data.name,
-                    height: Number(parsedData.data.dimensions.split("x")[0]),
-                    width: Number(parsedData.data.dimensions.split("x")[1]),
-                    createrId: (req as any).userId,
-                }
-            })
-
-            return res.status(200).json({
-                spaceId: space.id
-            })
-        }
-
-        // if mapId is given
         const map = await prismaClient.map.findUnique({
             where: {
                 id: parsedData.data.mapId,
@@ -47,6 +29,7 @@ export const createSpace = async (req: Request, res: Response) => {
             })
         }
 
+        let spaceId;
         await prismaClient.$transaction(async (tx) => {
             const space = await tx.space.create({
                 data: {

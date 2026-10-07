@@ -1,159 +1,113 @@
-# Turborepo starter
 
-This Turborepo starter is maintained by the Turborepo core team.
-
-## Using this example
-
-Run the following command:
-
-```sh
-npx create-turbo@latest
+```
+User opens a space
+  ↓
+Space lobby
+  ↓
+Select avatar + enter display name
+  ↓
+Join arena
+  ↓
+WebSocket broadcasts presence and position
 ```
 
-## What's inside?
+Use two kinds of data:
 
-This Turborepo includes the following packages/apps:
+### Persistent data
 
-### Apps and Packages
+Store these in PostgreSQL:
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+```
+Avatar
+- id
+- name
+- imageUrl      ← Cloudinary URL
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+User
+- avatarId      ← optional default avatar
+- name          ← optional global display name
 ```
 
-Without global `turbo`, use your package manager:
+The admin uploads avatar images to Cloudinary, then saves the Cloudinary URL in the `Avatar` table.
 
-```sh
-cd my-turborepo
-npx turbo build
-pnpm dlx turbo build
-pnpm exec turbo build
+### Temporary arena data
+
+Store these in WebSocket server memory:
+
+```
+type ConnectedPlayer = {
+  userId: string;
+  socketId: string;
+  spaceId: string;
+  displayName: string;
+  avatarId: string;
+  x: number;
+  y: number;
+};
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+When a user joins:
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo build --filter=docs
+```
+{
+  "type": "join-space",
+  "spaceId": "space-id",
+  "displayName": "Alex",
+  "avatarId": "avatar-id"
+}
 ```
 
-Without global `turbo`:
+The WebSocket server should then:
 
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+1. Validate the user’s session.
+2. Verify that the space exists.
+3. Verify that the avatar exists.
+4. Add the player to the in-memory room.
+5. Send the current players to the new user.
+6. Broadcast the new player to everyone else.
+
+Example broadcast:
+
+```
+{
+  "type": "player-joined",
+  "player": {
+    "userId": "user-id",
+    "displayName": "Alex",
+    "avatarId": "avatar-id",
+    "x": 200,
+    "y": 150
+  }
+}
 ```
 
-### Develop
+When the player moves:
 
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
+```
+{
+  "type": "player-moved",
+  "x": 240,
+  "y": 160
+}
 ```
 
-Without global `turbo`, use your package manager:
+The server should validate movement and broadcast the updated position.
 
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
+For your first version, keeping display name and selected avatar in memory is fine. They disappear when the user disconnects, which is normal for temporary presence data.
+
+Later, if you want each user to have a saved default avatar or display name, update:
+
+```
+User.avatarId
+User.name
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+A useful distinction:
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
+```
+User.avatarId       = user's default avatar
+Join payload avatar = avatar chosen for this session
+WebSocket memory    = current avatar/display name/position
 ```
 
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+You only need a database table such as `SpaceMember` later if you want persistent membership, saved player positions, private spaces, bans, or space-specific display names.

@@ -29,7 +29,6 @@ function App() {
       <Route element={<RequireAuth />}>
         <Route path="/app" element={<HomePage />} />
         <Route path="/app/create-space" element={<CreateSpacePage />} />
-        {/*secured lobby/details page. user choose an avatar/display name and join.*/}
         <Route path="/app/spaces/:spaceId" element={<SpacePage />} />
         <Route
           path="/app/spaces/:spaceId/arena"

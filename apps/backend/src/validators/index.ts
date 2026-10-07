@@ -18,8 +18,7 @@ export const UpdateMetaDataSchema = z.object({
 
 export const CreateSpaceSchema = z.object({
     name: z.string(),
-    dimensions: z.string().regex(/^[0-9]{1,4}x[0-9]{1,4}$/),
-    mapId: z.string().optional(),
+    mapId: z.string().min(1),
 })
 
 export const DeleteElementSchema = z.object({

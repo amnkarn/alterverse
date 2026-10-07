@@ -299,7 +299,11 @@ function AuthFormContainer({
         try {
             const response = await signin(payload);
             if (response.user) {
-                navigate("/app");
+                if (response.user.role === "Admin") {
+                    navigate("/admin");
+                } else {
+                    navigate("/app");
+                }
             }
         } catch (requestError) {
             setError(requestError instanceof Error && requestError.message !== "Failed to fetch"

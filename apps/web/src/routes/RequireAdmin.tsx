@@ -14,7 +14,7 @@ export default function RequireAdmin() {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if ((session.user as any).role !== "Admin") {
+  if ((session?.user as any)?.role !== "Admin") {
     return <Navigate to="/app" replace />;
   }
 

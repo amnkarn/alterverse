@@ -1,5 +1,6 @@
 
 
+// user choose an avatar/display name and join
 export default function SpacePage() {
     return (
         <div>

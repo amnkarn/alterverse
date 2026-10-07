@@ -264,7 +264,7 @@ export default function SpaceListPage() {
 
                                         {/* Right: Action button to enter */}
                                         <Link
-                                            to={`/app/spaces/${space.id}/arena`}
+                                            to={`/app/spaces/${space.id}`}
                                             className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white transition hover:scale-[1.03] active:scale-[0.98]"
                                             style={{
                                                 background: "rgba(139,92,246,0.22)",
