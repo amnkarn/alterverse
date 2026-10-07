@@ -5,6 +5,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { signin, signup, type SignInPayload, type SignUpPayload } from "../api/auth.api";
 import GithubIcon from "../assets/icons/Github";
 import { signIn } from "../lib/auth-client";
+import Loader from "../components/Loader";
 
 type ClassValue = string | false | null | undefined;
 
@@ -428,6 +429,7 @@ export default function AuthPage({ signInContent = {}, signUpContent = {} }: Aut
 
     if(loading) {
         //console.log(loading);
+        return <Loader />
     }
 
     return (

@@ -3,6 +3,7 @@ import { useSession, signOut } from "../lib/auth-client";
 import { Link, useNavigate } from "react-router-dom";
 import { Compass, Plus, LogOut } from "lucide-react";
 import FuzzyText from "../components/TextEffect";
+import Loader from "../components/Loader";
 
 export default function HomePage() {
     const { data: session, isPending } = useSession();
@@ -15,12 +16,7 @@ export default function HomePage() {
 
     if (isPending) {
         return (
-            <div className="flex h-screen w-screen items-center justify-center bg-[#030014] text-slate-400">
-                <div className="flex items-center gap-3">
-                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
-                    <span>Loading Alterverse...</span>
-                </div>
-            </div>
+            <Loader />
         );
     }
 
@@ -34,7 +30,6 @@ export default function HomePage() {
 
                 {/* ──────────────────── Nav ────────────────────── */}
                 <header className="flex-none w-full px-8 py-5 flex items-center justify-between">
-                    {/* Wordmark */}
                     <span
                         className="select-none font-black uppercase tracking-[0.18em] text-white/80"
                         style={{ fontSize: '0.85rem', letterSpacing: '0.2em' }}
@@ -42,7 +37,7 @@ export default function HomePage() {
                         ALTERVERSE
                     </span>
 
-                    {/* User pill / sign-in */}
+                    {/* user name / signout */}
                     { session?.user && 
                         <div
                             className="flex items-center gap-2.5 px-4 py-1.5 backdrop-blur-md border border-white/10 rounded-lg"
@@ -62,10 +57,9 @@ export default function HomePage() {
                     }
                 </header>
 
-                {/* ── Hero ──────────────────────────────────── */}
+                {/* ──────────────────── Hero ─────────────────────── */}
                 <main className="flex-1 flex flex-col items-center justify-center text-center px-4">
 
-                    {/* Main Title — bottom margin only on heading */}
                     <div className="mb-6">
                         <FuzzyText
                             fontSize="clamp(3rem, 9vw, 7rem)"
@@ -81,7 +75,6 @@ export default function HomePage() {
                         </FuzzyText>
                     </div>
 
-                    {/* Sub-description */}
                     <p
                         className="text-slate-300 max-w-lg leading-relaxed select-none"
                         style={{ fontSize: 'clamp(0.9rem, 1.6vw, 1.05rem)' }}
@@ -90,10 +83,8 @@ export default function HomePage() {
                         and start hanging out instantly.
                     </p>
 
-                    {/* CTA Buttons — glass morphism */}
                     <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
 
-                        {/* Primary glass button */}
                         <Link
                             to="/spaces"
                             className="group inline-flex items-center gap-2.5 px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-200 hover:scale-[1.03] active:scale-[0.97]"
@@ -109,7 +100,6 @@ export default function HomePage() {
                             Explore Spaces
                         </Link>
 
-                        {/* Secondary glass button */}
                         <Link
                             to="/app/create-space"
                             className="inline-flex items-center gap-2.5 px-6 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:text-white transition-all duration-200 hover:scale-[1.03] active:scale-[0.97]"

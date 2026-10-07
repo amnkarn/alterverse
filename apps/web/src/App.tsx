@@ -11,8 +11,8 @@ import ElementManagementPage from "./pages/admin/ElementManagementPage";
 import MapManagementPage from "./pages/admin/MapManagementPage";
 import HomePage from "./pages/HomePage";
 import CreateSpacePage from "./pages/CreateSpacePage";
-import RequireAuth from "./routes/RequireAdmin";
-import RequireAdmin from "./routes/RequireAuth";
+import RequireAuth from "./routes/RequireAuth";
+import RequireAdmin from "./routes/RequireAdmin";
 
 
 function App() {

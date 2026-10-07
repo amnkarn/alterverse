@@ -40,7 +40,7 @@ export default function LandingPage() {
             </Link>
 
             <Link
-              to="/space"
+              to="/spaces"
               className={styles.secondaryButton}
               style={{ color: "#0f172a", textDecoration: "none" }}
             >

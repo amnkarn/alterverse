@@ -1,22 +1,21 @@
-import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { Navigate, Outlet } from "react-router-dom";
 import { useSession } from "../lib/auth-client";
+import Loader from "../components/Loader";
 
-export default function RequireAuth() {
+export default function RequireAdmin() {
   const { data: session, isPending } = useSession();
-  const location = useLocation();
 
   if (isPending) {
-    return <div>Loading...</div>;
+    return <Loader />;
   }
 
   if (!session) {
-    return (
-      <Navigate
-        to="/login"
-        replace
-        state={{ from: location.pathname }}
-      />
-    );
+    return <Navigate to="/login" replace />;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if ((session.user as any).role !== "Admin") {
+    return <Navigate to="/app" replace />;
   }
 
   return <Outlet />;
