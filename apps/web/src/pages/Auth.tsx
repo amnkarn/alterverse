@@ -182,6 +182,7 @@ function FormDivider({ text = "or continue with email" }: { text?: string }) {
     );
 }
 
+//===============================SIGNIN FORM==================================
 function SignInForm({
     onSubmit,
     isSubmitting,
@@ -225,6 +226,8 @@ function SignInForm({
     );
 }
 
+
+//===============================SIGNUP FORM==================================
 function SignUpForm({
     onSubmit,
     isSubmitting,
@@ -239,12 +242,13 @@ function SignUpForm({
         const formData = new FormData(event.currentTarget);
         await onSubmit({
             email: String(formData.get("email") || ""),
+            name: String(formData.get("name") || ""),
             password: String(formData.get("password") || ""),
         });
     };
     return (
-        <form onSubmit={handleSignUp} autoComplete="on" className="flex flex-col gap-5">
-            <div className="flex flex-col items-center gap-2 text-center w-full">
+        <form onSubmit={handleSignUp} autoComplete="on" className="flex flex-col gap-3">
+            <div className="flex flex-col items-center text-center w-full">
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-100">Create an account</h1>
                 <p className="text-sm text-slate-400 max-w-sm leading-relaxed">Join the alterverse to explore virtual spaces and hang out in real-time.</p>
             </div>
@@ -253,10 +257,14 @@ function SignUpForm({
 
             <FormDivider text="or continue with email" />
 
-            <div className="grid gap-3.5">
+            <div className="grid gap-3.5 mt-2">
                 <div className="grid gap-1.5">
                     <Label htmlFor="email">Email</Label>
                     <Input id="email" name="email" type="email" placeholder="m@example.com" required autoComplete="email" />
+                </div>
+                <div className="grid gap-1.5">
+                    <Label htmlFor="name">Name</Label>
+                    <Input id="name" name="name" type="text" placeholder="Aman" required />
                 </div>
                 <PasswordInput name="password" label="Password" required minLength={6} autoComplete="new-password" placeholder="At least 6 characters" />
                 <Button type="submit" variant="outline" className="mt-1 w-full" disabled={isSubmitting} aria-busy={isSubmitting}>
@@ -268,6 +276,8 @@ function SignUpForm({
     );
 }
 
+
+//====================AUTH FORM CONTAINER STORING FORM AND SUBMIT BUTTON==========================
 function AuthFormContainer({
     isSignIn,
     onToggle,
@@ -281,11 +291,12 @@ function AuthFormContainer({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState("");
 
-    const handleAuth = async (payload: SignInPayload | SignUpPayload) => {
+    const handleManualLogin = async (payload: SignInPayload) => {
+        console.log(payload);
         setIsSubmitting(true);
         setError("");
         try {
-            const response = "name" in payload ? await signup(payload) : await signin(payload);
+            const response = await signin(payload);
             if (response.user) {
                 navigate("/space");
             }
@@ -296,14 +307,34 @@ function AuthFormContainer({
         } finally {
             setIsSubmitting(false);
         }
-    };
+    }
+
+    const handleManualRegister = async (payload: SignUpPayload) => {
+        console.log(payload);
+        setIsSubmitting(true);
+        setError("");
+        try {
+            const response = await signup(payload);
+            if (response.user) {
+                navigate("/space");
+            }
+        } catch (requestError) {
+            setError(requestError instanceof Error && requestError.message !== "Failed to fetch"
+                ? requestError.message
+                : "Unable to reach the authentication service. Make sure the backend is running.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
 
     return (
         <div className="mx-auto grid w-full max-w-105 px-4 sm:px-2 gap-3">
             {isSignIn ? (
-                <SignInForm onSubmit={handleAuth} isSubmitting={isSubmitting} onGithubLogin={onGithubLogin} />
+                // onSubmit return's email and passowrd
+                <SignInForm onSubmit={handleManualLogin} isSubmitting={isSubmitting} onGithubLogin={onGithubLogin} />
             ) : (
-                <SignUpForm onSubmit={handleAuth} isSubmitting={isSubmitting} onGithubLogin={onGithubLogin} />
+                // onSubmit return's email, name and passowrd
+                <SignUpForm onSubmit={handleManualRegister} isSubmitting={isSubmitting} onGithubLogin={onGithubLogin} />
             )}
             {error && <p role="alert" className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-sm text-red-300">{error}</p>}
             <div className="text-center text-sm">
@@ -353,6 +384,8 @@ const defaultSignUpContent = {
         author: "Alterverse"
     }
 };
+
+//=============================AUTH MAIN COMPONENT===========================================
 
 export default function AuthPage({ signInContent = {}, signUpContent = {} }: AuthUIProps) {
     const [loading, setLoading] = useState(false);
