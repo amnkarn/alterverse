@@ -14,7 +14,8 @@ const spaceRouter: Router = Router();
 
 spaceRouter.post("/", isUser, createSpace)
 
-spaceRouter.get("/all", isUser, allSpaces)
+// should not be secured
+spaceRouter.get("/all", allSpaces)
 
 spaceRouter.post("/element", isUser, createSpaceElement)
 

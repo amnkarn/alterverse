@@ -298,7 +298,7 @@ function AuthFormContainer({
         try {
             const response = await signin(payload);
             if (response.user) {
-                navigate("/space");
+                navigate("/app");
             }
         } catch (requestError) {
             setError(requestError instanceof Error && requestError.message !== "Failed to fetch"
@@ -316,7 +316,7 @@ function AuthFormContainer({
         try {
             const response = await signup(payload);
             if (response.user) {
-                navigate("/space");
+                navigate("/app");
             }
         } catch (requestError) {
             setError(requestError instanceof Error && requestError.message !== "Failed to fetch"
@@ -414,7 +414,7 @@ export default function AuthPage({ signInContent = {}, signUpContent = {} }: Aut
                 provider: "github",
                 // The OAuth callback is handled by the backend, but the final
                 // redirect must return the user to the frontend.
-                callbackURL: "http://localhost:5173/"
+                callbackURL: "http://localhost:5173/app"
             })
         } catch (error) {
             console.log(error);
@@ -444,7 +444,11 @@ export default function AuthPage({ signInContent = {}, signUpContent = {} }: Aut
                     <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                     Back to home
                 </Link>
-                <AuthFormContainer isSignIn={isSignIn} onToggle={toggleForm} onGithubLogin={handleGithubLogin} />
+                <AuthFormContainer 
+                    isSignIn={isSignIn} 
+                    onToggle={toggleForm} 
+                    onGithubLogin={handleGithubLogin} 
+                />
             </div>
 
             <div
