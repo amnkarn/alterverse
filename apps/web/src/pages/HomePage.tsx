@@ -125,24 +125,3 @@ export default function HomePage() {
         </LivingNebula>
     );
 }
-
-
-
-export const LivingNebulaDemo = () => (
-  <LivingNebula
-    particleCount={1200}
-    trailLength={0.15}
-    canvasGlow={20}
-    className="flex flex-col items-center justify-center text-center px-4 py-8"
-  >
-    <h1 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-300">
-      Living Nebula
-    </h1>
-    <p className="mt-4 text-lg text-gray-300 max-w-xl">
-      A generative star nursery that pulses with creative energy at the heart of the cosmos.
-    </p>
-    <button className="mt-8 px-6 py-3 bg-white/10 text-white rounded-lg backdrop-blur-sm border border-white/20 shadow-lg hover:bg-white/20 transition">
-      Witness Creation
-    </button>
-  </LivingNebula>
-)
