@@ -1,8 +1,12 @@
 import Skiper from "../components/Skipper";
 import { Link } from "react-router-dom";
 import styles from "./page.module.css";
+import { useSession } from "../lib/auth-client";
 
 export default function LandingPage() {
+  const { data: session } = useSession();
+  const getStartedTarget = session?.user ? "/app" : "/register";
+
   return (
     <main style={{ height: "100%", width: "100%", overflow: "hidden" }}>
       <Skiper>
@@ -18,7 +22,7 @@ export default function LandingPage() {
 
           <div className={styles.ctaGroup}>
             <Link
-              to="/register"
+              to={getStartedTarget}
               className={styles.primaryButton}
               style={{ color: "#ffffff", textDecoration: "none" }}
             >

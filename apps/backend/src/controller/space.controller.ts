@@ -193,11 +193,7 @@ export const findSpace = async (req: Request, res: Response) => {
 export const allSpaces = async (req: Request, res: Response) => {
     console.log("req reached to allSpaces controller")
     try {
-        const allSpaces = await prismaClient.space.findMany({
-            where: {
-                createrId: (req as any).userId,
-            }
-        })
+        const allSpaces = await prismaClient.space.findMany();
 
         return res.status(200).json({
             "spaces": allSpaces.map(e => ({
