@@ -1,32 +1,28 @@
 import { NextFunction, Request, Response } from "express";
-import jwt from "jsonwebtoken";
-import { JWT_SECRET } from "../config/config.js";
+import { fromNodeHeaders } from "better-auth/node";
+import { auth } from "../auth.js";
 
-
-export function isAdmin(req: Request, res: Response, next: NextFunction) {
-    const authHeader = req.headers["authorization"];
-    const token = authHeader?.split(" ")[1];
-
-    if (!authHeader || !authHeader.startsWith("Bearer ") || !token) {
-        return res.status(403).json({
-            message: "Auth token is missing or invalid format"
-        });
-    }
-
+export async function isAdmin(req: Request, res: Response, next: NextFunction) {
     try {
-        const decode = jwt.verify(token, JWT_SECRET) as {role: string, userId: string};
-        
-        if(decode.role !== "Admin") {
-            return res.status(403).json({ "message": "Unauthorised" })
+        const session = await auth.api.getSession({
+            headers: fromNodeHeaders(req.headers),
+        });
+
+        if (!session) {
+            return res.status(401).json({ message: "Authentication required" });
         }
-        
-        (req as any).userId = decode.userId;
+
+        const user = session.user as typeof session.user & { role?: string };
+        if (user.role !== "Admin") {
+            return res.status(403).json({ message: "Admin access required" });
+        }
+
+        (req as any).session = session;
+        (req as any).user = user;
+        (req as any).userId = user.id;
         next();
-        
     } catch (error) {
-        console.log("Error in 'isAdmin' middleware: ", error);
-        return res.status(401).json({
-            message: "Unauthorised"
-        })
+        console.error("Error in isAdmin middleware:", error);
+        return res.status(401).json({ message: "Unauthorized" });
     }
 }

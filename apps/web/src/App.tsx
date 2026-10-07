@@ -1,5 +1,5 @@
 import { Routes, Route } from "react-router-dom";
-import ArenaPage from "./pages/AreaPage";
+import ArenaPage from "./pages/ArenaPage";
 import LandingPage from "./pages/LandinPage";
 import SpaceListPage from "./pages/SpaceListPage";
 import SpacePage from "./pages/SpacePage";
