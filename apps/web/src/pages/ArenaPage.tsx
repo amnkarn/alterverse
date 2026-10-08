@@ -33,22 +33,21 @@ const PLAYER_RENDER_W = SPRITE_FRAME_W * PLAYER_SCALE;  // 192 px
 const PLAYER_RENDER_H = SPRITE_FRAME_H * PLAYER_SCALE;  // 192 px
 
 // Foot-level collision box (centered at player feet for natural RPG movement)
-const FEET_OFFSET_Y   = 18;
-const PLAYER_HW       = 12;  // half-width of foot hitbox
-const PLAYER_HH       = 8;   // half-height of foot hitbox
+const FEET_OFFSET_Y   = 38;
+const PLAYER_HW       = 12;  // half-width of foot hitbox (24px wide fits 32px doorways)
+const PLAYER_HH       = 8;   // half-height of foot hitbox (16px tall)
 const PLAYER_SPEED    = 4;
 
 // ─── Map & Bounds Config ──────────────────────────────────────────────────────
 const { tileSize: TILE_SIZE, width: MAP_PX_W, height: MAP_PX_H } = demoSpace.map;
 const TILESET_PNG_COLS = 2048 / TILE_SIZE; // FloorAndGround.png = 2048 wide
 
-// Playable floor area bounds in pixels
-const MAP_BOUNDS = {
-    minX: 160 + PLAYER_HW,
-    maxX: 1248 - PLAYER_HW,
-    minY: 64 + PLAYER_HH,
-    maxY: 928 - PLAYER_HH - FEET_OFFSET_Y,
-};
+// Solid wall GIDs present in the Ground tilelayer
+const WALL_GIDS = new Set<number>([
+    29, 65, 85, 88, 90, 92, 152, 154, 213, 216, 217, 218,
+    546, 594, 610, 658, 722, 723, 724, 785, 786, 787, 788,
+    793, 794, 993, 994, 995,
+]);
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
 
@@ -118,6 +117,7 @@ export default function ArenaPage() {
         groundData?:   number[];
         mapW?: number;
         mapH?: number;
+        wallGids?: Set<number>;
     }>({});
 
     // ── Backend sync stubs ────────────────────────────────────────────────
@@ -134,27 +134,44 @@ export default function ArenaPage() {
     }, []);
     void handleRemotePlayerUpdate;
 
-    // ── Direction parser ──────────────────────────────────────────────────
-    function getDir(keys: Set<string>): "down" | "left" | "right" | "up" | null {
-        if (keys.has("arrowdown")  || keys.has("keys") || keys.has("s")) return "down";
-        if (keys.has("arrowup")    || keys.has("keyw") || keys.has("w")) return "up";
-        if (keys.has("arrowleft")  || keys.has("keya") || keys.has("a")) return "left";
-        if (keys.has("arrowright") || keys.has("keyd") || keys.has("d")) return "right";
-        return null;
-    }
-
     // ── Collision checking ────────────────────────────────────────────────
     function collidesWithWall(nx: number, ny: number): boolean {
+        const assets = assetsRef.current;
         const footX = nx;
         const footY = ny + FEET_OFFSET_Y;
         const ax = footX - PLAYER_HW;
         const ay = footY - PLAYER_HH;
+        const bx = footX + PLAYER_HW;
+        const by = footY + PLAYER_HH;
+
+        // 1. Tilemap boundary, void space, and wall collision check
+        if (assets.groundData && assets.mapW && assets.mapH) {
+            const { groundData, mapW, mapH } = assets;
+            const activeWallGids = assets.wallGids ?? WALL_GIDS;
+
+            const minCol = Math.floor(ax / TILE_SIZE);
+            const maxCol = Math.floor((bx - 0.001) / TILE_SIZE);
+            const minRow = Math.floor(ay / TILE_SIZE);
+            const maxRow = Math.floor((by - 0.001) / TILE_SIZE);
+
+            for (let r = minRow; r <= maxRow; r++) {
+                for (let c = minCol; c <= maxCol; c++) {
+                    // Out of map grid bounds -> block
+                    if (c < 0 || c >= mapW || r < 0 || r >= mapH) return true;
+                    const gid = groundData[r * mapW + c];
+                    // Void / outside building (gid 0) or solid wall tile -> block
+                    if (gid === 0 || activeWallGids.has(gid)) return true;
+                }
+            }
+        }
+
+        // 2. Object layers collision check (desks, whiteboards, interior partitions, etc.)
         const aw = PLAYER_HW * 2;
         const ah = PLAYER_HH * 2;
-
         for (const rect of collisionRectsRef.current) {
             if (rectsOverlap(ax, ay, aw, ah, rect)) return true;
         }
+
         return false;
     }
 
@@ -264,29 +281,66 @@ export default function ArenaPage() {
         const camera = cameraRef.current;
 
         // ── Movement & collision logic ────────────────────────────────────
-        const dir = getDir(keys);
+        let vx = 0;
+        let vy = 0;
+        if (keys.has("arrowleft")  || keys.has("keya") || keys.has("a")) vx -= 1;
+        if (keys.has("arrowright") || keys.has("keyd") || keys.has("d")) vx += 1;
+        if (keys.has("arrowup")    || keys.has("keyw") || keys.has("w")) vy -= 1;
+        if (keys.has("arrowdown")  || keys.has("keys") || keys.has("s")) vy += 1;
+
         let moved = false;
 
-        if (dir) {
-            player.direction = dir;
-            const dx = dir === "left" ? -PLAYER_SPEED : dir === "right" ? PLAYER_SPEED : 0;
-            const dy = dir === "up"   ? -PLAYER_SPEED : dir === "down"  ? PLAYER_SPEED : 0;
+        if (vx !== 0 || vy !== 0) {
+            if (vy > 0) player.direction = "down";
+            else if (vy < 0) player.direction = "up";
+            else if (vx < 0) player.direction = "left";
+            else if (vx > 0) player.direction = "right";
 
-            const nextX = player.x + dx;
-            const nextY = player.y + dy;
+            const dx = vx * PLAYER_SPEED;
+            const dy = vy * PLAYER_SPEED;
 
-            // Clamp strictly within map bounds
-            const clampedX = Math.max(MAP_BOUNDS.minX, Math.min(MAP_BOUNDS.maxX, nextX));
-            const clampedY = Math.max(MAP_BOUNDS.minY, Math.min(MAP_BOUNDS.maxY, nextY));
-
-            // Test X & Y independently to enable wall sliding
-            if (!collidesWithWall(clampedX, player.y)) {
-                player.x = clampedX;
-                moved = true;
+            // Test X axis independently with pixel-stepping on contact for smooth sliding
+            if (dx !== 0) {
+                const targetX = Math.max(PLAYER_HW, Math.min(MAP_PX_W - PLAYER_HW, player.x + dx));
+                if (!collidesWithWall(targetX, player.y)) {
+                    player.x = targetX;
+                    moved = true;
+                } else {
+                    const step = Math.sign(dx);
+                    let cur = player.x;
+                    for (let s = 1; s <= Math.abs(dx); s++) {
+                        const testX = Math.max(PLAYER_HW, Math.min(MAP_PX_W - PLAYER_HW, cur + step));
+                        if (!collidesWithWall(testX, player.y)) {
+                            cur = testX;
+                            moved = true;
+                        } else {
+                            break;
+                        }
+                    }
+                    player.x = cur;
+                }
             }
-            if (!collidesWithWall(player.x, clampedY)) {
-                player.y = clampedY;
-                moved = true;
+
+            // Test Y axis independently with pixel-stepping on contact for smooth sliding
+            if (dy !== 0) {
+                const targetY = Math.max(PLAYER_HH, Math.min(MAP_PX_H - PLAYER_HH - FEET_OFFSET_Y, player.y + dy));
+                if (!collidesWithWall(player.x, targetY)) {
+                    player.y = targetY;
+                    moved = true;
+                } else {
+                    const step = Math.sign(dy);
+                    let cur = player.y;
+                    for (let s = 1; s <= Math.abs(dy); s++) {
+                        const testY = Math.max(PLAYER_HH, Math.min(MAP_PX_H - PLAYER_HH - FEET_OFFSET_Y, cur + step));
+                        if (!collidesWithWall(player.x, testY)) {
+                            cur = testY;
+                            moved = true;
+                        } else {
+                            break;
+                        }
+                    }
+                    player.y = cur;
+                }
             }
         }
 
@@ -414,6 +468,17 @@ export default function ArenaPage() {
                 const groundLayer = mapJson.layers.find((l: { name: string }) => l.name === "Ground");
                 const groundData  = (groundLayer?.data ?? []) as number[];
 
+                // Parse wall GIDs from tilesets dynamically
+                const loadedWallGids = new Set<number>(WALL_GIDS);
+                for (const ts of (mapJson.tilesets ?? [])) {
+                    for (const t of (ts.tiles ?? [])) {
+                        const p = t.properties?.find((prop: { name: string; value: boolean }) => prop.name === "collides");
+                        if (p?.value === true) {
+                            loadedWallGids.add((ts.firstgid ?? 1) + t.id);
+                        }
+                    }
+                }
+
                 // Parse collision rects from Tiled object layers
                 const collisionLayerNames = new Set(demoSpace.map.collisionLayers);
                 const rects: Rect[] = [];
@@ -436,23 +501,17 @@ export default function ArenaPage() {
                     groundData,
                     mapW: mapJson.width  as number,
                     mapH: mapJson.height as number,
+                    wallGids: loadedWallGids,
                 };
 
                 // Position player at verified safe spawn
                 const spawnX = demoSpace.spawnX;
                 let spawnY = demoSpace.spawnY;
 
-                // Self-resolve if spawn happens to collide
+                // Self-resolve if spawn happens to collide with walls or objects
                 let attempts = 0;
                 while (attempts < 20) {
-                    const footX = spawnX;
-                    const footY = spawnY + FEET_OFFSET_Y;
-                    const ax = footX - PLAYER_HW;
-                    const ay = footY - PLAYER_HH;
-                    const aw = PLAYER_HW * 2;
-                    const ah = PLAYER_HH * 2;
-                    const hit = rects.some((r) => rectsOverlap(ax, ay, aw, ah, r));
-                    if (!hit) break;
+                    if (!collidesWithWall(spawnX, spawnY)) break;
                     spawnY += 16;
                     attempts++;
                 }

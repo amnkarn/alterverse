@@ -52,7 +52,7 @@ export const demoMap: DemoMap = {
     tilesetUrl: "/assets/map/FloorAndGround.png",
     backgroundUrl: "/assets/background/bg.png",
     // Which Tiled object-group layer names count as solid walls
-    collisionLayers: ["Wall", "ObjectsOnCollide", "GenericObjectsOnCollide"],
+    collisionLayers: ["Wall", "ObjectsOnCollide", "GenericObjectsOnCollide", "Whiteboard", "VendingMachine"],
     elements: [
         // These are decorative overlays rendered on top of the tile map.
         // Replace imageUrl with real asset paths as your pipeline grows.
@@ -83,6 +83,6 @@ export const demoSpace: DemoSpace = {
     id: "demo-space",
     name: "Alterverse HQ",
     map: demoMap,
-    spawnX: 640,
+    spawnX: 700,
     spawnY: 600,
 };
