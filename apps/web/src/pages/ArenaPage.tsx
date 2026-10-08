@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useSession } from "../lib/auth-client";
+import { demoSpace } from "../data/demo-data";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -13,30 +14,41 @@ interface RemotePlayer {
     displayName: string;
 }
 
-interface ChatMessage {
-    id: number;
-    sender: string;
-    text: string;
-    self: boolean;
-    timestamp: number;
+interface Rect {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
 }
 
-// ─── Sprite Config ───────────────────────────────────────────────────────────
-// Local custom avatar spritesheet: 256×64 → 4 frames × 64px each per direction
-const SPRITE_FRAME_W = 64;
-const SPRITE_FRAME_H = 64;
-const SPRITE_FRAMES  = 4;
-const SPRITE_FPS     = 8;          // animation speed
-const PLAYER_SCALE   = 2;          // render at 2× size on screen
-const PLAYER_RENDER_W = SPRITE_FRAME_W * PLAYER_SCALE;
-const PLAYER_RENDER_H = SPRITE_FRAME_H * PLAYER_SCALE;
+// ─── Sprite / Player Config ───────────────────────────────────────────────────
+// Spritesheet: 256×64, 4 frames × 64 px each per direction
+const SPRITE_FRAME_W  = 64;
+const SPRITE_FRAME_H  = 64;
+const SPRITE_FRAMES   = 4;
+const SPRITE_FPS      = 8;
+// Render player at 3× scale for crisp, prominent visibility on full screen
+const PLAYER_SCALE    = 3;
+const PLAYER_RENDER_W = SPRITE_FRAME_W * PLAYER_SCALE;  // 192 px
+const PLAYER_RENDER_H = SPRITE_FRAME_H * PLAYER_SCALE;  // 192 px
 
-// Map / tile config
-const TILE_SIZE     = 32;
-const TILESET_COLS  = 2048 / TILE_SIZE; // FloorAndGround.png width ÷ tilesize = 64 cols
-const CANVAS_W      = 800;
-const CANVAS_H      = 600;
-const PLAYER_SPEED  = 3;
+// Foot-level collision box (centered at player feet for natural RPG movement)
+const FEET_OFFSET_Y   = 18;
+const PLAYER_HW       = 12;  // half-width of foot hitbox
+const PLAYER_HH       = 8;   // half-height of foot hitbox
+const PLAYER_SPEED    = 4;
+
+// ─── Map & Bounds Config ──────────────────────────────────────────────────────
+const { tileSize: TILE_SIZE, width: MAP_PX_W, height: MAP_PX_H } = demoSpace.map;
+const TILESET_PNG_COLS = 2048 / TILE_SIZE; // FloorAndGround.png = 2048 wide
+
+// Playable floor area bounds in pixels
+const MAP_BOUNDS = {
+    minX: 160 + PLAYER_HW,
+    maxX: 1248 - PLAYER_HW,
+    minY: 64 + PLAYER_HH,
+    maxY: 928 - PLAYER_HH - FEET_OFFSET_Y,
+};
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
 
@@ -44,235 +56,247 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload  = () => resolve(img);
-        img.onerror = () => reject(new Error(`Failed to load: ${src}`));
+        img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
         img.src = src;
     });
+}
+
+function rectsOverlap(ax: number, ay: number, aw: number, ah: number, r: Rect) {
+    return ax < r.x + r.w && ax + aw > r.x && ay < r.y + r.h && ay + ah > r.y;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function ArenaPage() {
-    const { spaceId } = useParams<{ spaceId: string }>();
-    const navigate    = useNavigate();
-    const location    = useLocation();
+    const { spaceId }       = useParams<{ spaceId: string }>();
+    const navigate          = useNavigate();
+    const location          = useLocation();
     const { data: session } = useSession();
 
-    // Passed from SpacePage via navigate state
-    const state = location.state as {
+    // Navigation state passed from SpacePage
+    const navState = location.state as {
         spaceId?: string;
         avatarId?: string;
         avatar?: { id: string; imageUrl: string; name: string };
         displayName?: string;
     } | null;
+    const displayName = navState?.displayName || session?.user?.name || "Player";
 
-    const displayName = state?.displayName || session?.user?.name || "Player";
+    // ── Canvas ref ────────────────────────────────────────────────────────
+    const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    // ── Refs: mutable game state (doesn't need React re-renders) ───────────
-    const canvasRef         = useRef<HTMLCanvasElement>(null);
-    const chatInputRef      = useRef<HTMLInputElement>(null);
-    const chatBodyRef       = useRef<HTMLDivElement>(null);
-    const messagesRef       = useRef<ChatMessage[]>([]);
-    const chatRenderRef     = useRef<(() => void) | null>(null);
-
-    const keysRef           = useRef<Set<string>>(new Set());
-    const playerRef         = useRef<{
-        x: number; y: number;
+    // ── Mutable game state ────────────────────────────────────────────────
+    const keysRef    = useRef<Set<string>>(new Set());
+    const playerRef  = useRef<{
+        x: number;
+        y: number;
         direction: "down" | "left" | "right" | "up";
         frame: number;
-    }>({ x: 400, y: 300, direction: "down", frame: 0 });
+    }>({
+        x: demoSpace.spawnX,
+        y: demoSpace.spawnY,
+        direction: "down",
+        frame: 0,
+    });
     const cameraRef         = useRef({ x: 0, y: 0 });
     const remotePlayersRef  = useRef<Map<string, RemotePlayer>>(new Map());
-    const lastFrameTime     = useRef(0);
+    const lastFrameTimeRef  = useRef(0);
     const animAccRef        = useRef(0);
     const rafRef            = useRef<number>(0);
-    const assetsRef         = useRef<{
-        spriteDown?:  HTMLImageElement;
-        spriteLeft?:  HTMLImageElement;
-        spriteRight?: HTMLImageElement;
-        spriteUp?:    HTMLImageElement;
-        floorTileset?:HTMLImageElement;
-        bgPattern?:   CanvasPattern | null;
-        mapData?:     { width: number; height: number; groundData: number[] };
+
+    // Collision rects from Tiled object layers
+    const collisionRectsRef = useRef<Rect[]>([]);
+
+    // Loaded assets
+    const assetsRef = useRef<{
+        spriteDown?:   HTMLImageElement;
+        spriteLeft?:   HTMLImageElement;
+        spriteRight?:  HTMLImageElement;
+        spriteUp?:     HTMLImageElement;
+        floorTileset?: HTMLImageElement;
+        bgPattern?:    CanvasPattern | null;
+        groundData?:   number[];
+        mapW?: number;
+        mapH?: number;
     }>({});
 
-    // ── Stub: backend sync hooks ────────────────────────────────────────────
+    // ── Backend sync stubs ────────────────────────────────────────────────
     const onLocalPlayerMove = useCallback(
-        (x: number, y: number, direction: string, frame: number) => {
-            // TODO: emit to WebSocket server
-            void x; void y; void direction; void frame;
+        (x: number, y: number, dir: string, frame: number) => {
+            void x; void y; void dir; void frame;
+            // Stub: emit to WebSocket server
         },
         []
     );
 
     const handleRemotePlayerUpdate = useCallback((players: RemotePlayer[]) => {
-        // TODO: called from WebSocket message handler
         players.forEach((p) => remotePlayersRef.current.set(p.id, p));
     }, []);
     void handleRemotePlayerUpdate;
 
-    // ── Chat helpers ────────────────────────────────────────────────────────
-    function sendSocketMessage(text: string) {
-        // TODO: hook up to WebSocket
-        void text;
-    }
-
-    const addMessage = useCallback((sender: string, text: string, self: boolean) => {
-        const msg: ChatMessage = {
-            id: Date.now() + Math.random(),
-            sender,
-            text,
-            self,
-            timestamp: Date.now(),
-        };
-        messagesRef.current = [...messagesRef.current.slice(-99), msg];
-        chatRenderRef.current?.();
-    }, []);
-
-    const handleChatSend = useCallback(() => {
-        const inp = chatInputRef.current;
-        if (!inp) return;
-        const text = inp.value.trim();
-        if (!text) return;
-        inp.value = "";
-        addMessage(displayName, text, true);
-        sendSocketMessage(text);
-    }, [addMessage, displayName]);
-
-    // ── Direction from keys ─────────────────────────────────────────────────
-    function getDirectionFromKeys(keys: Set<string>): "down" | "left" | "right" | "up" | null {
-        if (keys.has("ArrowDown") || keys.has("s") || keys.has("S"))  return "down";
-        if (keys.has("ArrowUp")   || keys.has("w") || keys.has("W"))  return "up";
-        if (keys.has("ArrowLeft") || keys.has("a") || keys.has("A"))  return "left";
-        if (keys.has("ArrowRight")|| keys.has("d") || keys.has("D"))  return "right";
+    // ── Direction parser ──────────────────────────────────────────────────
+    function getDir(keys: Set<string>): "down" | "left" | "right" | "up" | null {
+        if (keys.has("arrowdown")  || keys.has("keys") || keys.has("s")) return "down";
+        if (keys.has("arrowup")    || keys.has("keyw") || keys.has("w")) return "up";
+        if (keys.has("arrowleft")  || keys.has("keya") || keys.has("a")) return "left";
+        if (keys.has("arrowright") || keys.has("keyd") || keys.has("d")) return "right";
         return null;
     }
 
-    // ── Draw one player (local or remote) ──────────────────────────────────
+    // ── Collision checking ────────────────────────────────────────────────
+    function collidesWithWall(nx: number, ny: number): boolean {
+        const footX = nx;
+        const footY = ny + FEET_OFFSET_Y;
+        const ax = footX - PLAYER_HW;
+        const ay = footY - PLAYER_HH;
+        const aw = PLAYER_HW * 2;
+        const ah = PLAYER_HH * 2;
+
+        for (const rect of collisionRectsRef.current) {
+            if (rectsOverlap(ax, ay, aw, ah, rect)) return true;
+        }
+        return false;
+    }
+
+    // ── Draw player sprite + name tag ─────────────────────────────────────
     function drawPlayer(
         ctx: CanvasRenderingContext2D,
-        sprites: { down?: HTMLImageElement; left?: HTMLImageElement; right?: HTMLImageElement; up?: HTMLImageElement },
-        screenX: number,
-        screenY: number,
-        direction: "down" | "left" | "right" | "up",
+        sprites: Record<string, HTMLImageElement | undefined>,
+        sx: number,
+        sy: number,
+        dir: "down" | "left" | "right" | "up",
         frame: number,
         name: string,
         isLocal: boolean
     ) {
-        const sheet = direction === "down"  ? sprites.down
-                    : direction === "left"  ? sprites.left
-                    : direction === "right" ? sprites.right
-                    : sprites.up;
-
-        const drawX = screenX - PLAYER_RENDER_W / 2;
-        const drawY = screenY - PLAYER_RENDER_H / 2;
+        const sheet = sprites[dir];
+        const dw = PLAYER_RENDER_W;
+        const dh = PLAYER_RENDER_H;
+        const dx = sx - dw / 2;
+        const dy = sy - dh / 2;
 
         if (sheet) {
             ctx.drawImage(
                 sheet,
                 frame * SPRITE_FRAME_W, 0,
                 SPRITE_FRAME_W, SPRITE_FRAME_H,
-                drawX, drawY,
-                PLAYER_RENDER_W, PLAYER_RENDER_H
+                dx, dy, dw, dh
             );
         } else {
-            // Fallback: solid circle
-            ctx.fillStyle = isLocal ? "rgba(139,92,246,0.9)" : "rgba(100,200,255,0.9)";
+            ctx.fillStyle = isLocal ? "#8b5cf6" : "#38bdf8";
             ctx.beginPath();
-            ctx.arc(screenX, screenY, 16, 0, Math.PI * 2);
+            ctx.arc(sx, sy, 18, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        // Name-tag above head
+        // Clean name-tag above head
         ctx.save();
-        ctx.font        = "bold 12px 'Inter', sans-serif";
-        ctx.textAlign   = "center";
-        ctx.textBaseline= "bottom";
-        const tagY = drawY - 4;
+        ctx.font = "bold 13px 'Inter', system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        const tw = ctx.measureText(name).width;
+        const tagY = dy - 6;
+        const px = 7;
+        const py = 4;
 
-        // Background pill
-        const textW = ctx.measureText(name).width;
-        const padX = 6, padY = 3;
-        const bgX = screenX - textW / 2 - padX;
-        const bgW = textW + padX * 2;
-        const bgH = 16 + padY;
-        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
         ctx.beginPath();
-        ctx.roundRect(bgX, tagY - bgH, bgW, bgH, 4);
+        ctx.roundRect(sx - tw / 2 - px, tagY - 14 - py, tw + px * 2, 14 + py * 2, 5);
         ctx.fill();
 
         ctx.fillStyle = isLocal ? "#c4b5fd" : "#7dd3fc";
-        ctx.fillText(name, screenX, tagY - padY + 2);
+        ctx.fillText(name, sx, tagY);
         ctx.restore();
     }
 
-    // ── Draw map ground layer ───────────────────────────────────────────────
-    function drawMap(
+    // ── Draw tiled ground layer ───────────────────────────────────────────
+    function drawGround(
         ctx: CanvasRenderingContext2D,
         tileset: HTMLImageElement,
-        mapData: { width: number; height: number; groundData: number[] },
+        groundData: number[],
+        mapW: number,
+        mapH: number,
         camX: number,
-        camY: number
+        camY: number,
+        vw: number,
+        vh: number
     ) {
-        const { width: mapW, height: mapH, groundData } = mapData;
-        const tilesetCols = TILESET_COLS;
+        const c0 = Math.max(0, Math.floor(camX / TILE_SIZE));
+        const c1 = Math.min(mapW, Math.ceil((camX + vw) / TILE_SIZE) + 1);
+        const r0 = Math.max(0, Math.floor(camY / TILE_SIZE));
+        const r1 = Math.min(mapH, Math.ceil((camY + vh) / TILE_SIZE) + 1);
 
-        const startCol = Math.max(0, Math.floor(camX / TILE_SIZE));
-        const endCol   = Math.min(mapW, Math.ceil((camX + CANVAS_W) / TILE_SIZE) + 1);
-        const startRow = Math.max(0, Math.floor(camY / TILE_SIZE));
-        const endRow   = Math.min(mapH, Math.ceil((camY + CANVAS_H) / TILE_SIZE) + 1);
-
-        for (let row = startRow; row < endRow; row++) {
-            for (let col = startCol; col < endCol; col++) {
+        for (let row = r0; row < r1; row++) {
+            for (let col = c0; col < c1; col++) {
                 const gid = groundData[row * mapW + col];
                 if (!gid) continue;
-                const tileId  = gid - 1; // 1-indexed → 0-indexed
-                const srcX    = (tileId % tilesetCols) * TILE_SIZE;
-                const srcY    = Math.floor(tileId / tilesetCols) * TILE_SIZE;
-                const destX   = col * TILE_SIZE - camX;
-                const destY   = row * TILE_SIZE - camY;
-
-                ctx.drawImage(tileset, srcX, srcY, TILE_SIZE, TILE_SIZE, destX, destY, TILE_SIZE, TILE_SIZE);
+                const tid = gid - 1;
+                const sx = (tid % TILESET_PNG_COLS) * TILE_SIZE;
+                const sy = Math.floor(tid / TILESET_PNG_COLS) * TILE_SIZE;
+                ctx.drawImage(
+                    tileset,
+                    sx, sy, TILE_SIZE, TILE_SIZE,
+                    col * TILE_SIZE - camX,
+                    row * TILE_SIZE - camY,
+                    TILE_SIZE, TILE_SIZE
+                );
             }
         }
     }
 
-    // ── Main game loop ref (avoids forward-reference lint error) ────────────
+    // ── Main game loop ref ────────────────────────────────────────────────
     const gameLoopRef = useRef<((ts: number) => void) | null>(null);
 
-    // ── Main game loop ──────────────────────────────────────────────────────
     const gameLoop = useCallback((timestamp: number) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
 
-        const dt = timestamp - lastFrameTime.current;
-        lastFrameTime.current = timestamp;
+        const vw = canvas.width;
+        const vh = canvas.height;
+        const dt = Math.min(timestamp - lastFrameTimeRef.current, 50);
+        lastFrameTimeRef.current = timestamp;
 
         const assets = assetsRef.current;
         const keys   = keysRef.current;
         const player = playerRef.current;
         const camera = cameraRef.current;
 
-        // ── Movement ──────────────────────────────────────────────────────
-        const dir = getDirectionFromKeys(keys);
+        // ── Movement & collision logic ────────────────────────────────────
+        const dir = getDir(keys);
         let moved = false;
+
         if (dir) {
             player.direction = dir;
             const dx = dir === "left" ? -PLAYER_SPEED : dir === "right" ? PLAYER_SPEED : 0;
             const dy = dir === "up"   ? -PLAYER_SPEED : dir === "down"  ? PLAYER_SPEED : 0;
-            player.x += dx;
-            player.y += dy;
-            moved = true;
+
+            const nextX = player.x + dx;
+            const nextY = player.y + dy;
+
+            // Clamp strictly within map bounds
+            const clampedX = Math.max(MAP_BOUNDS.minX, Math.min(MAP_BOUNDS.maxX, nextX));
+            const clampedY = Math.max(MAP_BOUNDS.minY, Math.min(MAP_BOUNDS.maxY, nextY));
+
+            // Test X & Y independently to enable wall sliding
+            if (!collidesWithWall(clampedX, player.y)) {
+                player.x = clampedX;
+                moved = true;
+            }
+            if (!collidesWithWall(player.x, clampedY)) {
+                player.y = clampedY;
+                moved = true;
+            }
         }
 
-        // Animate only when moving
+        // Animate sprite frames when moving
         if (moved) {
             animAccRef.current += dt;
-            const msPerFrame = 1000 / SPRITE_FPS;
-            if (animAccRef.current >= msPerFrame) {
+            const mspf = 1000 / SPRITE_FPS;
+            if (animAccRef.current >= mspf) {
                 player.frame = (player.frame + 1) % SPRITE_FRAMES;
-                animAccRef.current -= msPerFrame;
+                animAccRef.current -= mspf;
                 onLocalPlayerMove(player.x, player.y, player.direction, player.frame);
             }
         } else {
@@ -280,46 +304,70 @@ export default function ArenaPage() {
             animAccRef.current = 0;
         }
 
-        // Camera follows player
-        camera.x = player.x - CANVAS_W / 2;
-        camera.y = player.y - CANVAS_H / 2;
-
-        // ── Clear ─────────────────────────────────────────────────────────
-        ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-
-        // ── Background pattern (infinite tiled) ───────────────────────────
-        if (assets.bgPattern) {
-            ctx.save();
-            ctx.translate(-((camera.x % 1000) + 1000) % 1000, -((camera.y % 1000) + 1000) % 1000);
-            ctx.fillStyle = assets.bgPattern;
-            ctx.fillRect(0, 0, CANVAS_W + 1000, CANVAS_H + 1000);
-            ctx.restore();
+        // ── Camera: center map if viewport is large, or follow player ─────
+        if (vw >= MAP_PX_W) {
+            camera.x = -(vw - MAP_PX_W) / 2;
         } else {
-            ctx.fillStyle = "#1a1625";
-            ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+            camera.x = Math.max(0, Math.min(MAP_PX_W - vw, player.x - vw / 2));
         }
 
-        // ── Tiled Map ─────────────────────────────────────────────────────
-        if (assets.floorTileset && assets.mapData) {
-            drawMap(ctx, assets.floorTileset, assets.mapData, camera.x, camera.y);
+        if (vh >= MAP_PX_H) {
+            camera.y = -(vh - MAP_PX_H) / 2;
+        } else {
+            camera.y = Math.max(0, Math.min(MAP_PX_H - vh, player.y - vh / 2));
+        }
+
+        // ── Clear Canvas ──────────────────────────────────────────────────
+        ctx.clearRect(0, 0, vw, vh);
+
+        // ── Background pattern ────────────────────────────────────────────
+        ctx.fillStyle = "#100e1d";
+        ctx.fillRect(0, 0, vw, vh);
+
+        if (assets.bgPattern) {
+            ctx.save();
+            const ox = -((camera.x % 1000) + 1000) % 1000;
+            const oy = -((camera.y % 1000) + 1000) % 1000;
+            ctx.translate(ox, oy);
+            ctx.fillStyle = assets.bgPattern;
+            ctx.fillRect(0, 0, vw + 1000, vh + 1000);
+            ctx.restore();
+        }
+
+        // ── Ground tiles ──────────────────────────────────────────────────
+        if (assets.floorTileset && assets.groundData && assets.mapW && assets.mapH) {
+            drawGround(
+                ctx,
+                assets.floorTileset,
+                assets.groundData,
+                assets.mapW,
+                assets.mapH,
+                camera.x,
+                camera.y,
+                vw,
+                vh
+            );
         }
 
         // ── Remote players ────────────────────────────────────────────────
-        const sprites = {
+        const sprites: Record<string, HTMLImageElement | undefined> = {
             down:  assets.spriteDown,
             left:  assets.spriteLeft,
             right: assets.spriteRight,
             up:    assets.spriteUp,
         };
+
         remotePlayersRef.current.forEach((rp) => {
             const sx = rp.x - camera.x;
             const sy = rp.y - camera.y;
-            if (sx < -64 || sx > CANVAS_W + 64 || sy < -64 || sy > CANVAS_H + 64) return; // frustum cull
+            if (sx < -96 || sx > vw + 96 || sy < -96 || sy > vh + 96) return;
             drawPlayer(ctx, sprites, sx, sy, rp.direction, rp.frame, rp.displayName, false);
         });
 
-        // ── Local player (always centered) ────────────────────────────────
-        drawPlayer(ctx, sprites, CANVAS_W / 2, CANVAS_H / 2, player.direction, player.frame, displayName, true);
+        // ── Local player ──────────────────────────────────────────────────
+        const localSx = player.x - camera.x;
+        const localSy = player.y - camera.y;
+        drawPlayer(ctx, sprites, localSx, localSy, player.direction, player.frame, displayName, true);
 
         rafRef.current = requestAnimationFrame((ts) => gameLoopRef.current?.(ts));
     }, [displayName, onLocalPlayerMove]);
@@ -328,36 +376,55 @@ export default function ArenaPage() {
         gameLoopRef.current = gameLoop;
     }, [gameLoop]);
 
-    // ── Load assets then start loop ─────────────────────────────────────────
+    // ── Resize handler: keep canvas full screen ───────────────────────────
+    useEffect(() => {
+        function onResize() {
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            canvas.width  = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        onResize();
+        window.addEventListener("resize", onResize);
+        return () => window.removeEventListener("resize", onResize);
+    }, []);
+
+    // ── Load assets, parse collision, start loop ──────────────────────────
     useEffect(() => {
         let cancelled = false;
 
         async function init() {
             try {
-                const [down, left, right, up, floor, bg, mapRes] = await Promise.all([
+                const [down, left, right, up, floor, bg, mapJson] = await Promise.all([
                     loadImage("/assets/avtar/Down/[TD] Character 0 Down Spritesheet.png"),
                     loadImage("/assets/avtar/Left/[TD] Character 0 Left Spritesheet.png"),
                     loadImage("/assets/avtar/Right/[TD] Character 0 Right Spritesheet.png"),
                     loadImage("/assets/avtar/Up/[TD] Character 0 Up Spritesheet.png"),
-                    loadImage("/assets/map/FloorAndGround.png"),
-                    loadImage("/assets/background/bg.png"),
-                    fetch("/assets/map/map.json").then((r) => r.json()),
+                    loadImage(demoSpace.map.tilesetUrl),
+                    loadImage(demoSpace.map.backgroundUrl),
+                    fetch(demoSpace.map.tiledJsonUrl).then((r) => r.json()),
                 ]);
 
                 if (cancelled) return;
 
-                // Build bg pattern
                 const canvas = canvasRef.current!;
                 const ctx    = canvas.getContext("2d")!;
                 const pat    = ctx.createPattern(bg, "repeat");
 
-                // Extract ground layer data
-                const groundLayer = mapRes.layers.find((l: { name: string }) => l.name === "Ground");
-                const mapData = {
-                    width:  mapRes.width  as number,
-                    height: mapRes.height as number,
-                    groundData: (groundLayer?.data ?? []) as number[],
-                };
+                const groundLayer = mapJson.layers.find((l: { name: string }) => l.name === "Ground");
+                const groundData  = (groundLayer?.data ?? []) as number[];
+
+                // Parse collision rects from Tiled object layers
+                const collisionLayerNames = new Set(demoSpace.map.collisionLayers);
+                const rects: Rect[] = [];
+                for (const layer of mapJson.layers) {
+                    if (!collisionLayerNames.has(layer.name)) continue;
+                    for (const obj of layer.objects ?? []) {
+                        const y = obj.gid ? obj.y - obj.height : obj.y;
+                        rects.push({ x: obj.x, y, w: obj.width, h: obj.height });
+                    }
+                }
+                collisionRectsRef.current = rects;
 
                 assetsRef.current = {
                     spriteDown:  down,
@@ -366,20 +433,39 @@ export default function ArenaPage() {
                     spriteUp:    up,
                     floorTileset: floor,
                     bgPattern:   pat,
-                    mapData,
+                    groundData,
+                    mapW: mapJson.width  as number,
+                    mapH: mapJson.height as number,
                 };
 
-                // Start player roughly in center of map
-                playerRef.current.x = (mapData.width  * TILE_SIZE) / 2;
-                playerRef.current.y = (mapData.height * TILE_SIZE) / 2;
+                // Position player at verified safe spawn
+                const spawnX = demoSpace.spawnX;
+                let spawnY = demoSpace.spawnY;
 
-                lastFrameTime.current = performance.now();
+                // Self-resolve if spawn happens to collide
+                let attempts = 0;
+                while (attempts < 20) {
+                    const footX = spawnX;
+                    const footY = spawnY + FEET_OFFSET_Y;
+                    const ax = footX - PLAYER_HW;
+                    const ay = footY - PLAYER_HH;
+                    const aw = PLAYER_HW * 2;
+                    const ah = PLAYER_HH * 2;
+                    const hit = rects.some((r) => rectsOverlap(ax, ay, aw, ah, r));
+                    if (!hit) break;
+                    spawnY += 16;
+                    attempts++;
+                }
+
+                playerRef.current.x = spawnX;
+                playerRef.current.y = spawnY;
+
+                lastFrameTimeRef.current = performance.now();
                 rafRef.current = requestAnimationFrame(gameLoop);
             } catch (err) {
-                console.error("[ArenaPage] Asset load error:", err);
+                console.error("[ArenaPage] init error:", err);
                 if (!cancelled) {
-                    // Start even if assets failed — will render fallback shapes
-                    lastFrameTime.current = performance.now();
+                    lastFrameTimeRef.current = performance.now();
                     rafRef.current = requestAnimationFrame(gameLoop);
                 }
             }
@@ -392,108 +478,83 @@ export default function ArenaPage() {
         };
     }, [gameLoop]);
 
-    // ── Keyboard events ─────────────────────────────────────────────────────
+    // ── Keyboard events ───────────────────────────────────────────────────
     useEffect(() => {
         const onDown = (e: KeyboardEvent) => {
-            // Don't capture if focus is in chat input
-            if (e.target === chatInputRef.current) return;
-            keysRef.current.add(e.key);
+            const keyLower = e.key.toLowerCase();
+            const codeLower = e.code.toLowerCase();
+
+            // Prevent default arrow / WASD scrolling
+            if (
+                ["arrowup", "arrowdown", "arrowleft", "arrowright", "space"].includes(keyLower) ||
+                ["w", "a", "s", "d"].includes(keyLower)
+            ) {
+                e.preventDefault();
+            }
+
+            keysRef.current.add(keyLower);
+            keysRef.current.add(codeLower);
         };
-        const onUp = (e: KeyboardEvent) => keysRef.current.delete(e.key);
+
+        const onUp = (e: KeyboardEvent) => {
+            const keyLower = e.key.toLowerCase();
+            const codeLower = e.code.toLowerCase();
+            keysRef.current.delete(keyLower);
+            keysRef.current.delete(codeLower);
+        };
+
+        const onBlur = () => {
+            keysRef.current.clear();
+        };
+
         window.addEventListener("keydown", onDown);
         window.addEventListener("keyup",   onUp);
+        window.addEventListener("blur",    onBlur);
+
         return () => {
             window.removeEventListener("keydown", onDown);
             window.removeEventListener("keyup",   onUp);
+            window.removeEventListener("blur",    onBlur);
         };
     }, []);
 
-    // ── Chat render hook ────────────────────────────────────────────────────
-    const renderChat = useCallback(() => {
-        const body = chatBodyRef.current;
-        if (!body) return;
-        body.innerHTML = "";
-        messagesRef.current.forEach((msg) => {
-            const row = document.createElement("div");
-            row.style.cssText = `
-                display:flex; flex-direction:column;
-                align-items: ${msg.self ? "flex-end" : "flex-start"};
-                gap: 1px; margin-bottom: 4px;
-            `;
-            const bubble = document.createElement("div");
-            bubble.style.cssText = `
-                max-width: 85%; padding: 4px 8px;
-                border-radius: 8px; font-size: 12px; line-height: 1.4;
-                background: ${msg.self ? "rgba(139,92,246,0.35)" : "rgba(255,255,255,0.08)"};
-                border: 1px solid ${msg.self ? "rgba(167,139,250,0.35)" : "rgba(255,255,255,0.1)"};
-                color: #f1f5f9; word-break: break-word;
-            `;
-            const sender = document.createElement("span");
-            sender.style.cssText = `font-size:10px; color:${msg.self ? "#c4b5fd" : "#94a3b8"}; font-weight:600;`;
-            sender.textContent = msg.self ? "You" : msg.sender;
-            bubble.prepend(sender, document.createElement("br"));
-            // Re-create text node safely
-            const textNode = document.createTextNode(msg.text);
-            bubble.appendChild(textNode);
-            row.appendChild(bubble);
-            body.appendChild(row);
-        });
-        body.scrollTop = body.scrollHeight;
-    }, []);
-
-    useEffect(() => {
-        chatRenderRef.current = renderChat;
-    }, [renderChat]);
-
+    // ── Render ────────────────────────────────────────────────────────────
     return (
-        <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                background: "#0d0b1e",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                overflow: "hidden",
-            }}
-        >
-            {/* ── Game Canvas ── */}
+        <div style={{ position: "fixed", inset: 0, overflow: "hidden", background: "#100e1d" }}>
+            {/* Full-screen game canvas */}
             <canvas
                 ref={canvasRef}
-                width={CANVAS_W}
-                height={CANVAS_H}
                 style={{
                     display: "block",
+                    width: "100%",
+                    height: "100%",
                     imageRendering: "pixelated",
-                    border: "1px solid rgba(255,255,255,0.07)",
-                    boxShadow: "0 0 60px rgba(0,0,0,0.8)",
                 }}
             />
 
-            {/* ── HUD Overlays ── */}
-
-            {/* Top-left: Space info */}
+            {/* ── Minimal HUD: top-left ─── */}
             <div
                 style={{
                     position: "absolute",
-                    top: 12,
-                    left: 12,
+                    top: 14,
+                    left: 14,
                     display: "flex",
                     flexDirection: "column",
-                    gap: 4,
+                    gap: 5,
                     userSelect: "none",
+                    pointerEvents: "none",
                 }}
             >
                 <div
                     style={{
-                        padding: "4px 10px",
+                        padding: "5px 12px",
                         borderRadius: 8,
-                        background: "rgba(9,7,24,0.75)",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        backdropFilter: "blur(8px)",
+                        background: "rgba(9, 7, 24, 0.72)",
+                        border: "1px solid rgba(255, 255, 255, 0.09)",
+                        backdropFilter: "blur(10px)",
                         fontSize: 11,
                         fontFamily: "monospace",
-                        letterSpacing: "0.12em",
+                        letterSpacing: "0.14em",
                         color: "#c4b5fd",
                         fontWeight: 700,
                         textTransform: "uppercase",
@@ -504,26 +565,26 @@ export default function ArenaPage() {
                 {spaceId && (
                     <div
                         style={{
-                            padding: "3px 8px",
+                            padding: "3px 9px",
                             borderRadius: 6,
-                            background: "rgba(139,92,246,0.12)",
-                            border: "1px solid rgba(167,139,250,0.2)",
+                            background: "rgba(139, 92, 246, 0.12)",
+                            border: "1px solid rgba(167, 139, 250, 0.2)",
                             fontSize: 10,
                             color: "#a78bfa",
                             fontFamily: "monospace",
                         }}
                     >
-                        Space: {spaceId.slice(0, 8)}…
+                        {demoSpace.name}
                     </div>
                 )}
             </div>
 
-            {/* Top-right: Player info + Exit */}
+            {/* ── Minimal HUD: top-right (Player badge & Leave button) ─── */}
             <div
                 style={{
                     position: "absolute",
-                    top: 12,
-                    right: 12,
+                    top: 14,
+                    right: 14,
                     display: "flex",
                     alignItems: "center",
                     gap: 8,
@@ -531,26 +592,27 @@ export default function ArenaPage() {
             >
                 <div
                     style={{
-                        padding: "4px 10px",
+                        padding: "5px 12px",
                         borderRadius: 8,
-                        background: "rgba(9,7,24,0.75)",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        backdropFilter: "blur(8px)",
-                        fontSize: 11,
+                        background: "rgba(9, 7, 24, 0.72)",
+                        border: "1px solid rgba(255, 255, 255, 0.09)",
+                        backdropFilter: "blur(10px)",
+                        fontSize: 12,
                         color: "#e2e8f0",
                         display: "flex",
                         alignItems: "center",
-                        gap: 6,
+                        gap: 7,
+                        userSelect: "none",
                     }}
                 >
                     <span
                         style={{
-                            width: 7,
-                            height: 7,
+                            width: 8,
+                            height: 8,
                             borderRadius: "50%",
                             background: "#34d399",
                             display: "inline-block",
-                            boxShadow: "0 0 6px #34d399",
+                            boxShadow: "0 0 7px #34d399",
                         }}
                     />
                     <span style={{ fontWeight: 600 }}>{displayName}</span>
@@ -559,12 +621,12 @@ export default function ArenaPage() {
                 <button
                     onClick={() => navigate(-1)}
                     style={{
-                        padding: "4px 10px",
+                        padding: "5px 12px",
                         borderRadius: 8,
-                        background: "rgba(239,68,68,0.15)",
-                        border: "1px solid rgba(239,68,68,0.3)",
-                        backdropFilter: "blur(8px)",
-                        fontSize: 11,
+                        background: "rgba(239, 68, 68, 0.14)",
+                        border: "1px solid rgba(239, 68, 68, 0.28)",
+                        backdropFilter: "blur(10px)",
+                        fontSize: 12,
                         color: "#fca5a5",
                         cursor: "pointer",
                         fontWeight: 600,
@@ -574,104 +636,25 @@ export default function ArenaPage() {
                 </button>
             </div>
 
-            {/* Bottom-left: Controls hint */}
+            {/* ── Minimal HUD: bottom-left (Controls hint) ─── */}
             <div
                 style={{
                     position: "absolute",
-                    bottom: 12,
-                    left: 12,
-                    padding: "4px 8px",
+                    bottom: 14,
+                    left: 14,
+                    padding: "4px 10px",
                     borderRadius: 6,
-                    background: "rgba(9,7,24,0.55)",
-                    border: "1px solid rgba(255,255,255,0.06)",
+                    background: "rgba(9, 7, 24, 0.5)",
+                    border: "1px solid rgba(255, 255, 255, 0.06)",
                     fontSize: 10,
                     color: "#64748b",
                     userSelect: "none",
                     pointerEvents: "none",
                     fontFamily: "monospace",
+                    letterSpacing: "0.05em",
                 }}
             >
                 WASD / Arrow keys to move
-            </div>
-
-            {/* Bottom-right: Chat HUD */}
-            <div
-                style={{
-                    position: "absolute",
-                    bottom: 12,
-                    right: 12,
-                    width: 280,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 4,
-                }}
-            >
-                {/* Messages area */}
-                <div
-                    ref={chatBodyRef}
-                    style={{
-                        height: 160,
-                        overflowY: "auto",
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "flex-end",
-                        padding: "6px 8px",
-                        borderRadius: "10px 10px 0 0",
-                        background: "rgba(9,7,24,0.65)",
-                        border: "1px solid rgba(255,255,255,0.06)",
-                        borderBottom: "none",
-                        backdropFilter: "blur(12px)",
-                        scrollbarWidth: "none",
-                    }}
-                />
-
-                {/* Input row */}
-                <div
-                    style={{
-                        display: "flex",
-                        gap: 4,
-                        padding: "5px 6px",
-                        borderRadius: "0 0 10px 10px",
-                        background: "rgba(9,7,24,0.75)",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        backdropFilter: "blur(12px)",
-                    }}
-                >
-                    <input
-                        ref={chatInputRef}
-                        type="text"
-                        maxLength={200}
-                        placeholder="Say something…"
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter") handleChatSend();
-                            e.stopPropagation(); // don't let WASD trigger movement
-                        }}
-                        style={{
-                            flex: 1,
-                            background: "transparent",
-                            border: "none",
-                            outline: "none",
-                            fontSize: 12,
-                            color: "#f1f5f9",
-                            fontFamily: "inherit",
-                        }}
-                    />
-                    <button
-                        onClick={handleChatSend}
-                        style={{
-                            padding: "3px 10px",
-                            borderRadius: 6,
-                            background: "rgba(139,92,246,0.7)",
-                            border: "1px solid rgba(167,139,250,0.4)",
-                            color: "#fff",
-                            fontSize: 11,
-                            fontWeight: 700,
-                            cursor: "pointer",
-                        }}
-                    >
-                        ↵
-                    </button>
-                </div>
             </div>
         </div>
     );
