@@ -156,6 +156,15 @@ export default function ArenaPage() {
     const mapRef = useRef<GameMap>(initialScaledMap);
     const collisionRectsRef = useRef<CollisionRect[]>(buildCollisionRectangles(initialScaledMap));
 
+    // ── Collision debug mode (Requirement 10: Toggle with 'C' key or ?debug=true) ──
+    const [debugMode, setDebugMode] = useState<boolean>(() => {
+        return typeof window !== "undefined" && window.location.search.includes("debug");
+    });
+    const debugModeRef = useRef<boolean>(debugMode);
+    useEffect(() => {
+        debugModeRef.current = debugMode;
+    }, [debugMode]);
+
     useEffect(() => {
         mapRef.current = map;
         collisionRectsRef.current = buildCollisionRectangles(map);
@@ -395,6 +404,31 @@ export default function ArenaPage() {
         const localSy = player.y - camera.y;
         drawPlayer(ctx, sprites, localSx, localSy, player.direction, player.frame, displayName, true);
 
+        // ── Debug mode: render collision rectangles in red (Requirement 10) ──
+        if (debugModeRef.current) {
+            ctx.save();
+            ctx.lineWidth = 1.5;
+            for (const rect of collisionRects) {
+                const sx = rect.x - camera.x;
+                const sy = rect.y - camera.y;
+                if (sx + rect.width < 0 || sx > vw || sy + rect.height < 0 || sy > vh) continue;
+                ctx.fillStyle = "rgba(239, 68, 68, 0.22)";
+                ctx.fillRect(sx, sy, rect.width, rect.height);
+                ctx.strokeStyle = "rgba(239, 68, 68, 0.85)";
+                ctx.strokeRect(sx, sy, rect.width, rect.height);
+            }
+            // Draw player foot collision box in green
+            const curFootX = player.x;
+            const curFootY = player.y + FEET_OFFSET_Y;
+            const footBoxSx = curFootX - 12 - camera.x;
+            const footBoxSy = curFootY - 8 - camera.y;
+            ctx.fillStyle = "rgba(34, 197, 94, 0.4)";
+            ctx.fillRect(footBoxSx, footBoxSy, 24, 16);
+            ctx.strokeStyle = "#22c55e";
+            ctx.strokeRect(footBoxSx, footBoxSy, 24, 16);
+            ctx.restore();
+        }
+
         rafRef.current = requestAnimationFrame((ts) => gameLoopRef.current?.(ts));
     }, [displayName, onLocalPlayerMove]);
 
@@ -421,10 +455,10 @@ export default function ArenaPage() {
 
         async function init() {
             try {
-                // Fetch canonical map JSON if available, or fall back to demoSpace.map
+                // Fetch canonical map.json directly (Requirement 1)
                 let loadedMap: GameMap = demoSpace.map;
                 try {
-                    const res = await fetch("/assets/map/demo-map.json");
+                    const res = await fetch("/assets/map/map.json");
                     if (res.ok) {
                         loadedMap = (await res.json()) as GameMap;
                     }
@@ -509,6 +543,11 @@ export default function ArenaPage() {
                 e.preventDefault();
             }
 
+            // Toggle collision debug mode with 'C' key (Requirement 10)
+            if (keyLower === "c" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                setDebugMode((prev) => !prev);
+            }
+
             keysRef.current.add(keyLower);
             keysRef.current.add(codeLower);
         };
@@ -582,7 +621,7 @@ export default function ArenaPage() {
                 
             </div>
 
-            {/* ── Prominent HUD: top-right (Player badge & Leave button) ─── */}
+            {/* ── Prominent HUD: top-right (Collision debug toggle, Player badge & Leave button) ─── */}
             <div
                 style={{
                     position: "absolute",
@@ -593,6 +632,40 @@ export default function ArenaPage() {
                     gap: 10,
                 }}
             >
+                {/* Collision debug toggle button */}
+                <button
+                    onClick={() => setDebugMode((prev) => !prev)}
+                    title="Toggle collision rectangles overlay (Hotkey: C)"
+                    style={{
+                        padding: "7px 14px",
+                        borderRadius: 10,
+                        background: debugMode ? "rgba(239, 68, 68, 0.22)" : "rgba(9, 7, 24, 0.76)",
+                        border: debugMode ? "1px solid rgba(239, 68, 68, 0.45)" : "1px solid rgba(255, 255, 255, 0.12)",
+                        backdropFilter: "blur(12px)",
+                        fontSize: 13,
+                        color: debugMode ? "#fca5a5" : "#94a3b8",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 7,
+                        fontFamily: "monospace",
+                        transition: "all 0.15s ease",
+                    }}
+                >
+                    <span
+                        style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            background: debugMode ? "#ef4444" : "#64748b",
+                            display: "inline-block",
+                            boxShadow: debugMode ? "0 0 8px #ef4444" : "none",
+                        }}
+                    />
+                    <span>[C] Collisions: {debugMode ? "ON" : "OFF"}</span>
+                </button>
+
                 <div
                     style={{
                         padding: "7px 16px",

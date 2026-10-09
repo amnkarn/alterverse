@@ -39,6 +39,34 @@ export type GameMap = {
         x: number;
         y: number;
     }[];
+
+    tilesets?: {
+        firstgid?: number;
+        name?: string;
+        image?: string;
+        tilewidth?: number;
+        tileheight?: number;
+        columns?: number;
+        tilecount?: number;
+        tiles?: {
+            id: number;
+            properties?: { name: string; type?: string; value: unknown }[];
+        }[];
+    }[];
+
+    layers?: {
+        id?: number;
+        name: string;
+        type: string;
+        width?: number;
+        height?: number;
+        visible?: boolean;
+        opacity?: number;
+        x?: number;
+        y?: number;
+        data?: number[];
+        objects?: unknown[];
+    }[];
 };
 
 export type CollisionRect = {

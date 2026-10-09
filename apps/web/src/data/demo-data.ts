@@ -2,9 +2,9 @@
 // Uses the canonical GameMap JSON format per specs/04-arena-fix.md
 
 import type { GameMap } from "../types/map";
-import demoMapJson from "./demo-map.json";
+import mapJson from "./map.json";
 
-export const demoMap: GameMap = demoMapJson as GameMap;
+export const demoMap: GameMap = mapJson as unknown as GameMap;
 
 export interface DemoSpace {
     id: string;

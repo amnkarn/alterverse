@@ -15,7 +15,28 @@ export function rectsOverlap(a: CollisionRect, b: CollisionRect): boolean {
  * 2. Element collision boxes
  */
 export function buildCollisionRectangles(map: GameMap): CollisionRect[] {
-    const solidSet = new Set(map.walls.solidTiles);
+    const solidSet = new Set<number>();
+
+    // 1. Extract solid GIDs from Tiled tile properties ("collides": true) if available
+    if (map.tilesets) {
+        for (const ts of map.tilesets) {
+            const firstgid = ts.firstgid ?? 1;
+            for (const tile of ts.tiles ?? []) {
+                const prop = tile.properties?.find((p) => p.name === "collides");
+                if (prop && prop.value === true) {
+                    solidSet.add(firstgid + tile.id);
+                }
+            }
+        }
+    }
+
+    // Also include solidTiles from walls layer
+    if (map.walls?.solidTiles) {
+        for (const gid of map.walls.solidTiles) {
+            solidSet.add(gid);
+        }
+    }
+
     const cols = Math.floor(map.width / map.tileSize);
     const rows = Math.floor(map.height / map.tileSize);
     const rects: CollisionRect[] = [];
