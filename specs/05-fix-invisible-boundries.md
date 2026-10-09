@@ -1,0 +1,1 @@
+# There are some invisible boundries that is stoping avtar to move

@@ -3,22 +3,26 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useSession } from "../lib/auth-client";
 import { demoSpace } from "../data/demo-data";
 import type { GameMap, CollisionRect, RemotePlayer } from "../types/map";
-import { buildCollisionRectangles, canMoveTo } from "../game/collision";
+import { buildCollisionRectangles, canMoveTo, scaleGameMap } from "../game/collision";
+
+// ─── Scale & Zoom Config ──────────────────────────────────────────────────────
+// Zooms map tiles, walls, and background without changing avatar size
+export const MAP_SCALE = 1.8;
 
 // ─── Sprite / Player Config ───────────────────────────────────────────────────
 // Spritesheet: 256×64, 4 frames × 64 px each per direction
 const SPRITE_FRAME_W  = 64;
 const SPRITE_FRAME_H  = 64;
 const SPRITE_FRAMES   = 4;
-const SPRITE_FPS      = 8;
-// Render player at 3× scale for crisp, prominent visibility on full screen
+const SPRITE_FPS      = 10;
+// Render player at 3× scale (kept unchanged per user preference)
 const PLAYER_SCALE    = 3;
 const PLAYER_RENDER_W = SPRITE_FRAME_W * PLAYER_SCALE; // 192 px
 const PLAYER_RENDER_H = SPRITE_FRAME_H * PLAYER_SCALE; // 192 px
 
 // Foot-level collision box offset (centered at player shoes for natural RPG movement)
 const FEET_OFFSET_Y   = 38;
-const PLAYER_SPEED    = 4;
+const PLAYER_SPEED    = 7;
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
 
@@ -42,7 +46,8 @@ function drawGround(
     vw: number,
     vh: number
 ) {
-    const tileSize = map.tileSize;
+    const tileSize = map.tileSize; // 48px at 1.5× scale
+    const srcTileSize = 32;        // original tileset tile dimension
     const tileCols = map.floor.tileColumns;
     const mapCols = Math.floor(map.width / tileSize);
     const mapRows = Math.floor(map.height / tileSize);
@@ -63,17 +68,17 @@ function drawGround(
             // Render floor tile
             if (floorGid && floorGid > 0) {
                 const tid = floorGid - 1;
-                const sx = (tid % tileCols) * tileSize;
-                const sy = Math.floor(tid / tileCols) * tileSize;
-                ctx.drawImage(tileset, sx, sy, tileSize, tileSize, destX, destY, tileSize, tileSize);
+                const sx = (tid % tileCols) * srcTileSize;
+                const sy = Math.floor(tid / tileCols) * srcTileSize;
+                ctx.drawImage(tileset, sx, sy, srcTileSize, srcTileSize, destX, destY, tileSize, tileSize);
             }
 
             // Render wall tile
             if (wallGid && wallGid > 0) {
                 const tid = wallGid - 1;
-                const sx = (tid % tileCols) * tileSize;
-                const sy = Math.floor(tid / tileCols) * tileSize;
-                ctx.drawImage(tileset, sx, sy, tileSize, tileSize, destX, destY, tileSize, tileSize);
+                const sx = (tid % tileCols) * srcTileSize;
+                const sy = Math.floor(tid / tileCols) * srcTileSize;
+                ctx.drawImage(tileset, sx, sy, srcTileSize, srcTileSize, destX, destY, tileSize, tileSize);
             }
         }
     }
@@ -105,23 +110,23 @@ function drawPlayer(
     } else {
         ctx.fillStyle = isLocal ? "#8b5cf6" : "#38bdf8";
         ctx.beginPath();
-        ctx.arc(sx, sy, 18, 0, Math.PI * 2);
+        ctx.arc(sx, sy, 22, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    // Clean name tag above avatar head
+    // Name tag above avatar head
     ctx.save();
-    ctx.font = "bold 13px 'Inter', system-ui, sans-serif";
+    ctx.font = "bold 14px 'Inter', system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
     const tw = ctx.measureText(name).width;
     const tagY = dy - 6;
-    const px = 7;
-    const py = 4;
+    const px = 8;
+    const py = 5;
 
-    ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.68)";
     ctx.beginPath();
-    ctx.roundRect(sx - tw / 2 - px, tagY - 14 - py, tw + px * 2, 14 + py * 2, 5);
+    ctx.roundRect(sx - tw / 2 - px, tagY - 16 - py, tw + px * 2, 16 + py * 2, 6);
     ctx.fill();
 
     ctx.fillStyle = isLocal ? "#c4b5fd" : "#7dd3fc";
@@ -146,10 +151,11 @@ export default function ArenaPage() {
     } | null;
     const displayName = navState?.displayName || session?.user?.name || "Player";
 
-    // ── Canonical GameMap state & collision ───────────────────────────────
-    const [map, setMap] = useState<GameMap>(demoSpace.map);
-    const mapRef = useRef<GameMap>(demoSpace.map);
-    const collisionRectsRef = useRef<CollisionRect[]>(buildCollisionRectangles(demoSpace.map));
+    // ── Canonical GameMap state & collision (scaled) ──────────────────────
+    const initialScaledMap = scaleGameMap(demoSpace.map, MAP_SCALE);
+    const [map, setMap] = useState<GameMap>(initialScaledMap);
+    const mapRef = useRef<GameMap>(initialScaledMap);
+    const collisionRectsRef = useRef<CollisionRect[]>(buildCollisionRectangles(initialScaledMap));
 
     useEffect(() => {
         mapRef.current = map;
@@ -160,7 +166,7 @@ export default function ArenaPage() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // ── Mutable game state ────────────────────────────────────────────────
-    const defaultSpawn = map.spawnPoints[0] ?? { x: 700, y: 600 };
+    const defaultSpawn = initialScaledMap.spawnPoints[0] ?? { x: 1050, y: 900 };
     const keysRef    = useRef<Set<string>>(new Set());
     const playerRef  = useRef<{
         x: number;
@@ -314,21 +320,23 @@ export default function ArenaPage() {
         // ── Clear Canvas ──────────────────────────────────────────────────
         ctx.clearRect(0, 0, vw, vh);
 
-        // ── Background pattern ────────────────────────────────────────────
+        // ── Background pattern (zoomed to match map scale) ────────────────
         ctx.fillStyle = "#100e1d";
         ctx.fillRect(0, 0, vw, vh);
 
         if (assets.bgPattern) {
             ctx.save();
-            const ox = -((camera.x % 1000) + 1000) % 1000;
-            const oy = -((camera.y % 1000) + 1000) % 1000;
+            const patSize = 1000 * MAP_SCALE;
+            const ox = -((camera.x % patSize) + patSize) % patSize;
+            const oy = -((camera.y % patSize) + patSize) % patSize;
             ctx.translate(ox, oy);
+            ctx.scale(MAP_SCALE, MAP_SCALE);
             ctx.fillStyle = assets.bgPattern;
-            ctx.fillRect(0, 0, vw + 1000, vh + 1000);
+            ctx.fillRect(0, 0, (vw + patSize) / MAP_SCALE, (vh + patSize) / MAP_SCALE);
             ctx.restore();
         }
 
-        // ── Render canonical map floor & walls ────────────────────────────
+        // ── Render canonical map floor & walls (zoomed) ───────────────────
         if (assets.floorTileset) {
             drawGround(
                 ctx,
@@ -356,7 +364,7 @@ export default function ArenaPage() {
             drawPlayer(ctx, sprites, sx, sy, rp.direction, rp.frame, rp.displayName, false);
         });
 
-        // ── Local player ──────────────────────────────────────────────────
+        // ── Local player (rendered at full unzoomed avatar size) ───────────
         const localSx = player.x - camera.x;
         const localSy = player.y - camera.y;
         drawPlayer(ctx, sprites, localSx, localSy, player.direction, player.frame, displayName, true);
@@ -398,9 +406,10 @@ export default function ArenaPage() {
                     // Fall back to bundled demoSpace.map
                 }
 
+                const scaled = scaleGameMap(loadedMap, MAP_SCALE);
                 if (cancelled) return;
-                setMap(loadedMap);
-                const rects = buildCollisionRectangles(loadedMap);
+                setMap(scaled);
+                const rects = buildCollisionRectangles(scaled);
                 collisionRectsRef.current = rects;
 
                 const [down, left, right, up, floor, bg] = await Promise.all([
@@ -408,7 +417,7 @@ export default function ArenaPage() {
                     loadImage("/assets/avtar/Left/[TD] Character 0 Left Spritesheet.png"),
                     loadImage("/assets/avtar/Right/[TD] Character 0 Right Spritesheet.png"),
                     loadImage("/assets/avtar/Up/[TD] Character 0 Up Spritesheet.png"),
-                    loadImage(loadedMap.floor.image),
+                    loadImage(scaled.floor.image),
                     loadImage("/assets/background/bg.png"),
                 ]);
 
@@ -428,13 +437,13 @@ export default function ArenaPage() {
                 };
 
                 // Position player at verified safe spawn point
-                const initialSpawn = loadedMap.spawnPoints[0] ?? { x: 700, y: 600 };
+                const initialSpawn = scaled.spawnPoints[0] ?? { x: 700 * MAP_SCALE, y: 600 * MAP_SCALE };
                 const spawnX = initialSpawn.x;
                 let spawnY = initialSpawn.y;
 
                 let attempts = 0;
                 while (attempts < 20) {
-                    if (canMoveTo(spawnX, spawnY + FEET_OFFSET_Y, loadedMap, rects)) break;
+                    if (canMoveTo(spawnX, spawnY + FEET_OFFSET_Y, scaled, rects)) break;
                     spawnY += 16;
                     attempts++;
                 }
@@ -514,29 +523,29 @@ export default function ArenaPage() {
                 }}
             />
 
-            {/* ── Minimal HUD: top-left (Space name) ─── */}
+            {/* ── Prominent HUD: top-left (LOGO) ─── */}
             <div
                 style={{
                     position: "absolute",
-                    top: 14,
-                    left: 14,
+                    top: 18,
+                    left: 18,
                     display: "flex",
                     flexDirection: "column",
-                    gap: 5,
+                    gap: 6,
                     userSelect: "none",
                     pointerEvents: "none",
                 }}
             >
                 <div
                     style={{
-                        padding: "5px 12px",
-                        borderRadius: 8,
-                        background: "rgba(9, 7, 24, 0.72)",
-                        border: "1px solid rgba(255, 255, 255, 0.09)",
-                        backdropFilter: "blur(10px)",
-                        fontSize: 11,
+                        padding: "7px 16px",
+                        borderRadius: 10,
+                        background: "rgba(9, 7, 24, 0.76)",
+                        border: "1px solid rgba(255, 255, 255, 0.12)",
+                        backdropFilter: "blur(12px)",
+                        fontSize: 13,
                         fontFamily: "monospace",
-                        letterSpacing: "0.14em",
+                        letterSpacing: "0.15em",
                         color: "#c4b5fd",
                         fontWeight: 700,
                         textTransform: "uppercase",
@@ -544,57 +553,43 @@ export default function ArenaPage() {
                 >
                     ALTERVERSE
                 </div>
-                {spaceId && (
-                    <div
-                        style={{
-                            padding: "3px 9px",
-                            borderRadius: 6,
-                            background: "rgba(139, 92, 246, 0.12)",
-                            border: "1px solid rgba(167, 139, 250, 0.2)",
-                            fontSize: 10,
-                            color: "#a78bfa",
-                            fontFamily: "monospace",
-                        }}
-                    >
-                        {map.name}
-                    </div>
-                )}
+                
             </div>
 
-            {/* ── Minimal HUD: top-right (Player badge & Leave button) ─── */}
+            {/* ── Prominent HUD: top-right (Player badge & Leave button) ─── */}
             <div
                 style={{
                     position: "absolute",
-                    top: 14,
-                    right: 14,
+                    top: 18,
+                    right: 18,
                     display: "flex",
                     alignItems: "center",
-                    gap: 8,
+                    gap: 10,
                 }}
             >
                 <div
                     style={{
-                        padding: "5px 12px",
-                        borderRadius: 8,
-                        background: "rgba(9, 7, 24, 0.72)",
-                        border: "1px solid rgba(255, 255, 255, 0.09)",
-                        backdropFilter: "blur(10px)",
-                        fontSize: 12,
+                        padding: "7px 16px",
+                        borderRadius: 10,
+                        background: "rgba(9, 7, 24, 0.76)",
+                        border: "1px solid rgba(255, 255, 255, 0.12)",
+                        backdropFilter: "blur(12px)",
+                        fontSize: 14,
                         color: "#e2e8f0",
                         display: "flex",
                         alignItems: "center",
-                        gap: 7,
+                        gap: 8,
                         userSelect: "none",
                     }}
                 >
                     <span
                         style={{
-                            width: 8,
-                            height: 8,
+                            width: 10,
+                            height: 10,
                             borderRadius: "50%",
                             background: "#34d399",
                             display: "inline-block",
-                            boxShadow: "0 0 7px #34d399",
+                            boxShadow: "0 0 8px #34d399",
                         }}
                     />
                     <span style={{ fontWeight: 600 }}>{displayName}</span>
@@ -603,33 +598,34 @@ export default function ArenaPage() {
                 <button
                     onClick={() => navigate(-1)}
                     style={{
-                        padding: "5px 12px",
-                        borderRadius: 8,
-                        background: "rgba(239, 68, 68, 0.14)",
-                        border: "1px solid rgba(239, 68, 68, 0.28)",
-                        backdropFilter: "blur(10px)",
-                        fontSize: 12,
+                        padding: "7px 16px",
+                        borderRadius: 10,
+                        background: "rgba(239, 68, 68, 0.16)",
+                        border: "1px solid rgba(239, 68, 68, 0.32)",
+                        backdropFilter: "blur(12px)",
+                        fontSize: 14,
                         color: "#fca5a5",
                         cursor: "pointer",
                         fontWeight: 600,
+                        transition: "background 0.15s, border-color 0.15s",
                     }}
                 >
                     ✕ Leave
                 </button>
             </div>
 
-            {/* ── Minimal HUD: bottom-left (Controls hint) ─── */}
+            {/* ── Prominent HUD: bottom-left (Controls hint) ─── */}
             <div
                 style={{
                     position: "absolute",
-                    bottom: 14,
-                    left: 14,
-                    padding: "4px 10px",
-                    borderRadius: 6,
-                    background: "rgba(9, 7, 24, 0.5)",
-                    border: "1px solid rgba(255, 255, 255, 0.06)",
-                    fontSize: 10,
-                    color: "#64748b",
+                    bottom: 18,
+                    left: 18,
+                    padding: "6px 14px",
+                    borderRadius: 8,
+                    background: "rgba(9, 7, 24, 0.58)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    fontSize: 12,
+                    color: "#94a3b8",
                     userSelect: "none",
                     pointerEvents: "none",
                     fontFamily: "monospace",

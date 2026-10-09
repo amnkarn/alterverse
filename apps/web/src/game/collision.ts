@@ -96,3 +96,38 @@ export function canMoveTo(
 
     return true;
 }
+
+/**
+ * Scales a GameMap's tileSize, width, height, elements, and spawn points by a scale factor.
+ */
+export function scaleGameMap(rawMap: GameMap, scale: number): GameMap {
+    if (scale === 1) return rawMap;
+    const scaledTileSize = Math.round(rawMap.tileSize * scale);
+    const tileScale = scaledTileSize / rawMap.tileSize;
+    const cols = Math.floor(rawMap.width / rawMap.tileSize);
+    const rows = Math.floor(rawMap.height / rawMap.tileSize);
+
+    return {
+        ...rawMap,
+        width: cols * scaledTileSize,
+        height: rows * scaledTileSize,
+        tileSize: scaledTileSize,
+        elements: rawMap.elements.map((el) => ({
+            ...el,
+            x: Math.round(el.x * tileScale),
+            y: Math.round(el.y * tileScale),
+            collision: el.collision
+                ? {
+                      x: Math.round(el.collision.x * tileScale),
+                      y: Math.round(el.collision.y * tileScale),
+                      width: Math.round(el.collision.width * tileScale),
+                      height: Math.round(el.collision.height * tileScale),
+                  }
+                : undefined,
+        })),
+        spawnPoints: rawMap.spawnPoints.map((sp) => ({
+            x: Math.round(sp.x * tileScale),
+            y: Math.round(sp.y * tileScale),
+        })),
+    };
+}
