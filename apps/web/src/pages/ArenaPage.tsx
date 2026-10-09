@@ -120,7 +120,7 @@ function drawPlayer(
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
     const tw = ctx.measureText(name).width;
-    const tagY = dy - 6;
+    const tagY = dy + 45;
     const px = 8;
     const py = 5;
 
