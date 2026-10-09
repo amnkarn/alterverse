@@ -1,25 +1,9 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useSession } from "../lib/auth-client";
 import { demoSpace } from "../data/demo-data";
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface RemotePlayer {
-    id: string;
-    x: number;
-    y: number;
-    direction: "down" | "left" | "right" | "up";
-    frame: number;
-    displayName: string;
-}
-
-interface Rect {
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-}
+import type { GameMap, CollisionRect, RemotePlayer } from "../types/map";
+import { buildCollisionRectangles, canMoveTo } from "../game/collision";
 
 // ─── Sprite / Player Config ───────────────────────────────────────────────────
 // Spritesheet: 256×64, 4 frames × 64 px each per direction
@@ -29,25 +13,12 @@ const SPRITE_FRAMES   = 4;
 const SPRITE_FPS      = 8;
 // Render player at 3× scale for crisp, prominent visibility on full screen
 const PLAYER_SCALE    = 3;
-const PLAYER_RENDER_W = SPRITE_FRAME_W * PLAYER_SCALE;  // 192 px
-const PLAYER_RENDER_H = SPRITE_FRAME_H * PLAYER_SCALE;  // 192 px
+const PLAYER_RENDER_W = SPRITE_FRAME_W * PLAYER_SCALE; // 192 px
+const PLAYER_RENDER_H = SPRITE_FRAME_H * PLAYER_SCALE; // 192 px
 
-// Foot-level collision box (centered at player feet for natural RPG movement)
+// Foot-level collision box offset (centered at player shoes for natural RPG movement)
 const FEET_OFFSET_Y   = 38;
-const PLAYER_HW       = 12;  // half-width of foot hitbox (24px wide fits 32px doorways)
-const PLAYER_HH       = 8;   // half-height of foot hitbox (16px tall)
 const PLAYER_SPEED    = 4;
-
-// ─── Map & Bounds Config ──────────────────────────────────────────────────────
-const { tileSize: TILE_SIZE, width: MAP_PX_W, height: MAP_PX_H } = demoSpace.map;
-const TILESET_PNG_COLS = 2048 / TILE_SIZE; // FloorAndGround.png = 2048 wide
-
-// Solid wall GIDs present in the Ground tilelayer
-const WALL_GIDS = new Set<number>([
-    29, 65, 85, 88, 90, 92, 152, 154, 213, 216, 217, 218,
-    546, 594, 610, 658, 722, 723, 724, 785, 786, 787, 788,
-    793, 794, 993, 994, 995,
-]);
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
 
@@ -60,8 +31,102 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     });
 }
 
-function rectsOverlap(ax: number, ay: number, aw: number, ah: number, r: Rect) {
-    return ax < r.x + r.w && ax + aw > r.x && ay < r.y + r.h && ay + ah > r.y;
+// ─── Render Helpers ──────────────────────────────────────────────────────────
+
+function drawGround(
+    ctx: CanvasRenderingContext2D,
+    tileset: HTMLImageElement,
+    map: GameMap,
+    camX: number,
+    camY: number,
+    vw: number,
+    vh: number
+) {
+    const tileSize = map.tileSize;
+    const tileCols = map.floor.tileColumns;
+    const mapCols = Math.floor(map.width / tileSize);
+    const mapRows = Math.floor(map.height / tileSize);
+
+    const c0 = Math.max(0, Math.floor(camX / tileSize));
+    const c1 = Math.min(mapCols, Math.ceil((camX + vw) / tileSize) + 1);
+    const r0 = Math.max(0, Math.floor(camY / tileSize));
+    const r1 = Math.min(mapRows, Math.ceil((camY + vh) / tileSize) + 1);
+
+    for (let row = r0; row < r1; row++) {
+        for (let col = c0; col < c1; col++) {
+            const idx = row * mapCols + col;
+            const floorGid = map.floor.tiles[idx];
+            const wallGid = map.walls.tiles[idx];
+            const destX = col * tileSize - camX;
+            const destY = row * tileSize - camY;
+
+            // Render floor tile
+            if (floorGid && floorGid > 0) {
+                const tid = floorGid - 1;
+                const sx = (tid % tileCols) * tileSize;
+                const sy = Math.floor(tid / tileCols) * tileSize;
+                ctx.drawImage(tileset, sx, sy, tileSize, tileSize, destX, destY, tileSize, tileSize);
+            }
+
+            // Render wall tile
+            if (wallGid && wallGid > 0) {
+                const tid = wallGid - 1;
+                const sx = (tid % tileCols) * tileSize;
+                const sy = Math.floor(tid / tileCols) * tileSize;
+                ctx.drawImage(tileset, sx, sy, tileSize, tileSize, destX, destY, tileSize, tileSize);
+            }
+        }
+    }
+}
+
+function drawPlayer(
+    ctx: CanvasRenderingContext2D,
+    sprites: Record<string, HTMLImageElement | undefined>,
+    sx: number,
+    sy: number,
+    dir: "down" | "left" | "right" | "up",
+    frame: number,
+    name: string,
+    isLocal: boolean
+) {
+    const sheet = sprites[dir];
+    const dw = PLAYER_RENDER_W;
+    const dh = PLAYER_RENDER_H;
+    const dx = sx - dw / 2;
+    const dy = sy - dh / 2;
+
+    if (sheet) {
+        ctx.drawImage(
+            sheet,
+            frame * SPRITE_FRAME_W, 0,
+            SPRITE_FRAME_W, SPRITE_FRAME_H,
+            dx, dy, dw, dh
+        );
+    } else {
+        ctx.fillStyle = isLocal ? "#8b5cf6" : "#38bdf8";
+        ctx.beginPath();
+        ctx.arc(sx, sy, 18, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Clean name tag above avatar head
+    ctx.save();
+    ctx.font = "bold 13px 'Inter', system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    const tw = ctx.measureText(name).width;
+    const tagY = dy - 6;
+    const px = 7;
+    const py = 4;
+
+    ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+    ctx.beginPath();
+    ctx.roundRect(sx - tw / 2 - px, tagY - 14 - py, tw + px * 2, 14 + py * 2, 5);
+    ctx.fill();
+
+    ctx.fillStyle = isLocal ? "#c4b5fd" : "#7dd3fc";
+    ctx.fillText(name, sx, tagY);
+    ctx.restore();
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -81,10 +146,21 @@ export default function ArenaPage() {
     } | null;
     const displayName = navState?.displayName || session?.user?.name || "Player";
 
+    // ── Canonical GameMap state & collision ───────────────────────────────
+    const [map, setMap] = useState<GameMap>(demoSpace.map);
+    const mapRef = useRef<GameMap>(demoSpace.map);
+    const collisionRectsRef = useRef<CollisionRect[]>(buildCollisionRectangles(demoSpace.map));
+
+    useEffect(() => {
+        mapRef.current = map;
+        collisionRectsRef.current = buildCollisionRectangles(map);
+    }, [map]);
+
     // ── Canvas ref ────────────────────────────────────────────────────────
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // ── Mutable game state ────────────────────────────────────────────────
+    const defaultSpawn = map.spawnPoints[0] ?? { x: 700, y: 600 };
     const keysRef    = useRef<Set<string>>(new Set());
     const playerRef  = useRef<{
         x: number;
@@ -92,8 +168,8 @@ export default function ArenaPage() {
         direction: "down" | "left" | "right" | "up";
         frame: number;
     }>({
-        x: demoSpace.spawnX,
-        y: demoSpace.spawnY,
+        x: defaultSpawn.x,
+        y: defaultSpawn.y,
         direction: "down",
         frame: 0,
     });
@@ -103,10 +179,7 @@ export default function ArenaPage() {
     const animAccRef        = useRef(0);
     const rafRef            = useRef<number>(0);
 
-    // Collision rects from Tiled object layers
-    const collisionRectsRef = useRef<Rect[]>([]);
-
-    // Loaded assets
+    // ── Loaded assets ─────────────────────────────────────────────────────
     const assetsRef = useRef<{
         spriteDown?:   HTMLImageElement;
         spriteLeft?:   HTMLImageElement;
@@ -114,10 +187,6 @@ export default function ArenaPage() {
         spriteUp?:     HTMLImageElement;
         floorTileset?: HTMLImageElement;
         bgPattern?:    CanvasPattern | null;
-        groundData?:   number[];
-        mapW?: number;
-        mapH?: number;
-        wallGids?: Set<number>;
     }>({});
 
     // ── Backend sync stubs ────────────────────────────────────────────────
@@ -129,139 +198,7 @@ export default function ArenaPage() {
         []
     );
 
-    const handleRemotePlayerUpdate = useCallback((players: RemotePlayer[]) => {
-        players.forEach((p) => remotePlayersRef.current.set(p.id, p));
-    }, []);
-    void handleRemotePlayerUpdate;
-
-    // ── Collision checking ────────────────────────────────────────────────
-    function collidesWithWall(nx: number, ny: number): boolean {
-        const assets = assetsRef.current;
-        const footX = nx;
-        const footY = ny + FEET_OFFSET_Y;
-        const ax = footX - PLAYER_HW;
-        const ay = footY - PLAYER_HH;
-        const bx = footX + PLAYER_HW;
-        const by = footY + PLAYER_HH;
-
-        // 1. Tilemap boundary, void space, and wall collision check
-        if (assets.groundData && assets.mapW && assets.mapH) {
-            const { groundData, mapW, mapH } = assets;
-            const activeWallGids = assets.wallGids ?? WALL_GIDS;
-
-            const minCol = Math.floor(ax / TILE_SIZE);
-            const maxCol = Math.floor((bx - 0.001) / TILE_SIZE);
-            const minRow = Math.floor(ay / TILE_SIZE);
-            const maxRow = Math.floor((by - 0.001) / TILE_SIZE);
-
-            for (let r = minRow; r <= maxRow; r++) {
-                for (let c = minCol; c <= maxCol; c++) {
-                    // Out of map grid bounds -> block
-                    if (c < 0 || c >= mapW || r < 0 || r >= mapH) return true;
-                    const gid = groundData[r * mapW + c];
-                    // Void / outside building (gid 0) or solid wall tile -> block
-                    if (gid === 0 || activeWallGids.has(gid)) return true;
-                }
-            }
-        }
-
-        // 2. Object layers collision check (desks, whiteboards, interior partitions, etc.)
-        const aw = PLAYER_HW * 2;
-        const ah = PLAYER_HH * 2;
-        for (const rect of collisionRectsRef.current) {
-            if (rectsOverlap(ax, ay, aw, ah, rect)) return true;
-        }
-
-        return false;
-    }
-
-    // ── Draw player sprite + name tag ─────────────────────────────────────
-    function drawPlayer(
-        ctx: CanvasRenderingContext2D,
-        sprites: Record<string, HTMLImageElement | undefined>,
-        sx: number,
-        sy: number,
-        dir: "down" | "left" | "right" | "up",
-        frame: number,
-        name: string,
-        isLocal: boolean
-    ) {
-        const sheet = sprites[dir];
-        const dw = PLAYER_RENDER_W;
-        const dh = PLAYER_RENDER_H;
-        const dx = sx - dw / 2;
-        const dy = sy - dh / 2;
-
-        if (sheet) {
-            ctx.drawImage(
-                sheet,
-                frame * SPRITE_FRAME_W, 0,
-                SPRITE_FRAME_W, SPRITE_FRAME_H,
-                dx, dy, dw, dh
-            );
-        } else {
-            ctx.fillStyle = isLocal ? "#8b5cf6" : "#38bdf8";
-            ctx.beginPath();
-            ctx.arc(sx, sy, 18, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        // Clean name-tag above head
-        ctx.save();
-        ctx.font = "bold 13px 'Inter', system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "bottom";
-        const tw = ctx.measureText(name).width;
-        const tagY = dy - 6;
-        const px = 7;
-        const py = 4;
-
-        ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
-        ctx.beginPath();
-        ctx.roundRect(sx - tw / 2 - px, tagY - 14 - py, tw + px * 2, 14 + py * 2, 5);
-        ctx.fill();
-
-        ctx.fillStyle = isLocal ? "#c4b5fd" : "#7dd3fc";
-        ctx.fillText(name, sx, tagY);
-        ctx.restore();
-    }
-
-    // ── Draw tiled ground layer ───────────────────────────────────────────
-    function drawGround(
-        ctx: CanvasRenderingContext2D,
-        tileset: HTMLImageElement,
-        groundData: number[],
-        mapW: number,
-        mapH: number,
-        camX: number,
-        camY: number,
-        vw: number,
-        vh: number
-    ) {
-        const c0 = Math.max(0, Math.floor(camX / TILE_SIZE));
-        const c1 = Math.min(mapW, Math.ceil((camX + vw) / TILE_SIZE) + 1);
-        const r0 = Math.max(0, Math.floor(camY / TILE_SIZE));
-        const r1 = Math.min(mapH, Math.ceil((camY + vh) / TILE_SIZE) + 1);
-
-        for (let row = r0; row < r1; row++) {
-            for (let col = c0; col < c1; col++) {
-                const gid = groundData[row * mapW + col];
-                if (!gid) continue;
-                const tid = gid - 1;
-                const sx = (tid % TILESET_PNG_COLS) * TILE_SIZE;
-                const sy = Math.floor(tid / TILESET_PNG_COLS) * TILE_SIZE;
-                ctx.drawImage(
-                    tileset,
-                    sx, sy, TILE_SIZE, TILE_SIZE,
-                    col * TILE_SIZE - camX,
-                    row * TILE_SIZE - camY,
-                    TILE_SIZE, TILE_SIZE
-                );
-            }
-        }
-    }
-
-    // ── Main game loop ref ────────────────────────────────────────────────
+    // ── Main game loop ────────────────────────────────────────────────────
     const gameLoopRef = useRef<((ts: number) => void) | null>(null);
 
     const gameLoop = useCallback((timestamp: number) => {
@@ -275,6 +212,8 @@ export default function ArenaPage() {
         const dt = Math.min(timestamp - lastFrameTimeRef.current, 50);
         lastFrameTimeRef.current = timestamp;
 
+        const currentMap = mapRef.current;
+        const collisionRects = collisionRectsRef.current;
         const assets = assetsRef.current;
         const keys   = keysRef.current;
         const player = playerRef.current;
@@ -298,48 +237,49 @@ export default function ArenaPage() {
 
             const dx = vx * PLAYER_SPEED;
             const dy = vy * PLAYER_SPEED;
+            const curFootX = player.x;
+            const curFootY = player.y + FEET_OFFSET_Y;
 
             // Test X axis independently with pixel-stepping on contact for smooth sliding
             if (dx !== 0) {
-                const targetX = Math.max(PLAYER_HW, Math.min(MAP_PX_W - PLAYER_HW, player.x + dx));
-                if (!collidesWithWall(targetX, player.y)) {
-                    player.x = targetX;
+                const targetFootX = curFootX + dx;
+                if (canMoveTo(targetFootX, curFootY, currentMap, collisionRects)) {
+                    player.x += dx;
                     moved = true;
                 } else {
                     const step = Math.sign(dx);
-                    let cur = player.x;
+                    let fx = curFootX;
                     for (let s = 1; s <= Math.abs(dx); s++) {
-                        const testX = Math.max(PLAYER_HW, Math.min(MAP_PX_W - PLAYER_HW, cur + step));
-                        if (!collidesWithWall(testX, player.y)) {
-                            cur = testX;
+                        if (canMoveTo(fx + step, curFootY, currentMap, collisionRects)) {
+                            fx += step;
+                            player.x += step;
                             moved = true;
                         } else {
                             break;
                         }
                     }
-                    player.x = cur;
                 }
             }
 
             // Test Y axis independently with pixel-stepping on contact for smooth sliding
             if (dy !== 0) {
-                const targetY = Math.max(PLAYER_HH, Math.min(MAP_PX_H - PLAYER_HH - FEET_OFFSET_Y, player.y + dy));
-                if (!collidesWithWall(player.x, targetY)) {
-                    player.y = targetY;
+                const updatedFootX = player.x;
+                const targetFootY = curFootY + dy;
+                if (canMoveTo(updatedFootX, targetFootY, currentMap, collisionRects)) {
+                    player.y += dy;
                     moved = true;
                 } else {
                     const step = Math.sign(dy);
-                    let cur = player.y;
+                    let fy = curFootY;
                     for (let s = 1; s <= Math.abs(dy); s++) {
-                        const testY = Math.max(PLAYER_HH, Math.min(MAP_PX_H - PLAYER_HH - FEET_OFFSET_Y, cur + step));
-                        if (!collidesWithWall(player.x, testY)) {
-                            cur = testY;
+                        if (canMoveTo(updatedFootX, fy + step, currentMap, collisionRects)) {
+                            fy += step;
+                            player.y += step;
                             moved = true;
                         } else {
                             break;
                         }
                     }
-                    player.y = cur;
                 }
             }
         }
@@ -358,17 +298,17 @@ export default function ArenaPage() {
             animAccRef.current = 0;
         }
 
-        // ── Camera: center map if viewport is large, or follow player ─────
-        if (vw >= MAP_PX_W) {
-            camera.x = -(vw - MAP_PX_W) / 2;
+        // ── Camera: center map if viewport is larger, follow player if smaller
+        if (vw >= currentMap.width) {
+            camera.x = -(vw - currentMap.width) / 2;
         } else {
-            camera.x = Math.max(0, Math.min(MAP_PX_W - vw, player.x - vw / 2));
+            camera.x = Math.max(0, Math.min(currentMap.width - vw, player.x - vw / 2));
         }
 
-        if (vh >= MAP_PX_H) {
-            camera.y = -(vh - MAP_PX_H) / 2;
+        if (vh >= currentMap.height) {
+            camera.y = -(vh - currentMap.height) / 2;
         } else {
-            camera.y = Math.max(0, Math.min(MAP_PX_H - vh, player.y - vh / 2));
+            camera.y = Math.max(0, Math.min(currentMap.height - vh, player.y - vh / 2));
         }
 
         // ── Clear Canvas ──────────────────────────────────────────────────
@@ -388,14 +328,12 @@ export default function ArenaPage() {
             ctx.restore();
         }
 
-        // ── Ground tiles ──────────────────────────────────────────────────
-        if (assets.floorTileset && assets.groundData && assets.mapW && assets.mapH) {
+        // ── Render canonical map floor & walls ────────────────────────────
+        if (assets.floorTileset) {
             drawGround(
                 ctx,
                 assets.floorTileset,
-                assets.groundData,
-                assets.mapW,
-                assets.mapH,
+                currentMap,
                 camera.x,
                 camera.y,
                 vw,
@@ -443,20 +381,35 @@ export default function ArenaPage() {
         return () => window.removeEventListener("resize", onResize);
     }, []);
 
-    // ── Load assets, parse collision, start loop ──────────────────────────
+    // ── Load map JSON & assets, start game loop ───────────────────────────
     useEffect(() => {
         let cancelled = false;
 
         async function init() {
             try {
-                const [down, left, right, up, floor, bg, mapJson] = await Promise.all([
+                // Fetch canonical map JSON if available, or fall back to demoSpace.map
+                let loadedMap: GameMap = demoSpace.map;
+                try {
+                    const res = await fetch("/assets/map/demo-map.json");
+                    if (res.ok) {
+                        loadedMap = (await res.json()) as GameMap;
+                    }
+                } catch {
+                    // Fall back to bundled demoSpace.map
+                }
+
+                if (cancelled) return;
+                setMap(loadedMap);
+                const rects = buildCollisionRectangles(loadedMap);
+                collisionRectsRef.current = rects;
+
+                const [down, left, right, up, floor, bg] = await Promise.all([
                     loadImage("/assets/avtar/Down/[TD] Character 0 Down Spritesheet.png"),
                     loadImage("/assets/avtar/Left/[TD] Character 0 Left Spritesheet.png"),
                     loadImage("/assets/avtar/Right/[TD] Character 0 Right Spritesheet.png"),
                     loadImage("/assets/avtar/Up/[TD] Character 0 Up Spritesheet.png"),
-                    loadImage(demoSpace.map.tilesetUrl),
-                    loadImage(demoSpace.map.backgroundUrl),
-                    fetch(demoSpace.map.tiledJsonUrl).then((r) => r.json()),
+                    loadImage(loadedMap.floor.image),
+                    loadImage("/assets/background/bg.png"),
                 ]);
 
                 if (cancelled) return;
@@ -465,53 +418,23 @@ export default function ArenaPage() {
                 const ctx    = canvas.getContext("2d")!;
                 const pat    = ctx.createPattern(bg, "repeat");
 
-                const groundLayer = mapJson.layers.find((l: { name: string }) => l.name === "Ground");
-                const groundData  = (groundLayer?.data ?? []) as number[];
-
-                // Parse wall GIDs from tilesets dynamically
-                const loadedWallGids = new Set<number>(WALL_GIDS);
-                for (const ts of (mapJson.tilesets ?? [])) {
-                    for (const t of (ts.tiles ?? [])) {
-                        const p = t.properties?.find((prop: { name: string; value: boolean }) => prop.name === "collides");
-                        if (p?.value === true) {
-                            loadedWallGids.add((ts.firstgid ?? 1) + t.id);
-                        }
-                    }
-                }
-
-                // Parse collision rects from Tiled object layers
-                const collisionLayerNames = new Set(demoSpace.map.collisionLayers);
-                const rects: Rect[] = [];
-                for (const layer of mapJson.layers) {
-                    if (!collisionLayerNames.has(layer.name)) continue;
-                    for (const obj of layer.objects ?? []) {
-                        const y = obj.gid ? obj.y - obj.height : obj.y;
-                        rects.push({ x: obj.x, y, w: obj.width, h: obj.height });
-                    }
-                }
-                collisionRectsRef.current = rects;
-
                 assetsRef.current = {
-                    spriteDown:  down,
-                    spriteLeft:  left,
-                    spriteRight: right,
-                    spriteUp:    up,
+                    spriteDown:   down,
+                    spriteLeft:   left,
+                    spriteRight:  right,
+                    spriteUp:     up,
                     floorTileset: floor,
-                    bgPattern:   pat,
-                    groundData,
-                    mapW: mapJson.width  as number,
-                    mapH: mapJson.height as number,
-                    wallGids: loadedWallGids,
+                    bgPattern:    pat,
                 };
 
-                // Position player at verified safe spawn
-                const spawnX = demoSpace.spawnX;
-                let spawnY = demoSpace.spawnY;
+                // Position player at verified safe spawn point
+                const initialSpawn = loadedMap.spawnPoints[0] ?? { x: 700, y: 600 };
+                const spawnX = initialSpawn.x;
+                let spawnY = initialSpawn.y;
 
-                // Self-resolve if spawn happens to collide with walls or objects
                 let attempts = 0;
                 while (attempts < 20) {
-                    if (!collidesWithWall(spawnX, spawnY)) break;
+                    if (canMoveTo(spawnX, spawnY + FEET_OFFSET_Y, loadedMap, rects)) break;
                     spawnY += 16;
                     attempts++;
                 }
@@ -591,7 +514,7 @@ export default function ArenaPage() {
                 }}
             />
 
-            {/* ── Minimal HUD: top-left ─── */}
+            {/* ── Minimal HUD: top-left (Space name) ─── */}
             <div
                 style={{
                     position: "absolute",
@@ -633,7 +556,7 @@ export default function ArenaPage() {
                             fontFamily: "monospace",
                         }}
                     >
-                        {demoSpace.name}
+                        {map.name}
                     </div>
                 )}
             </div>

@@ -1,0 +1,58 @@
+export type MapElement = {
+    id: string;
+    elementId: string;
+    x: number;
+    y: number;
+    rotation?: number;
+    layer?: number;
+    collision?: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    };
+};
+
+export type GameMap = {
+    id: string;
+    name: string;
+    width: number;
+    height: number;
+    tileSize: number;
+
+    floor: {
+        image: string;
+        tileColumns: number;
+        tiles: number[];
+    };
+
+    walls: {
+        image: string;
+        tileColumns: number;
+        tiles: number[];
+        solidTiles: number[];
+    };
+
+    elements: MapElement[];
+
+    spawnPoints: {
+        x: number;
+        y: number;
+    }[];
+};
+
+export type CollisionRect = {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+};
+
+export interface RemotePlayer {
+    id: string;
+    x: number;
+    y: number;
+    direction: "down" | "left" | "right" | "up";
+    frame: number;
+    displayName: string;
+}

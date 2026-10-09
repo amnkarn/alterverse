@@ -11,7 +11,10 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "build:backend": "cd apps/backend && bun run build",
+    "start:backend": "cd apps/backend && bun run ./src/server.ts",
+    "db:generate": "cd packages/db && bunx prisma generate && cd ../.."
   },
   "devDependencies": {
     "prettier": "^3.7.4",
