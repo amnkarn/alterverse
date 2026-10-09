@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../lib/auth-client";
 import { demoSpace } from "../data/demo-data";
 import type { GameMap, CollisionRect, RemotePlayer } from "../types/map";
@@ -137,7 +137,6 @@ function drawPlayer(
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function ArenaPage() {
-    const { spaceId }       = useParams<{ spaceId: string }>();
     const navigate          = useNavigate();
     const location          = useLocation();
     const { data: session } = useSession();
@@ -167,8 +166,9 @@ export default function ArenaPage() {
 
     // ── Mutable game state ────────────────────────────────────────────────
     const defaultSpawn = initialScaledMap.spawnPoints[0] ?? { x: 1050, y: 900 };
-    const keysRef    = useRef<Set<string>>(new Set());
-    const playerRef  = useRef<{
+    const initialDprRef     = useRef<number>(window.devicePixelRatio || 1);
+    const keysRef           = useRef<Set<string>>(new Set());
+    const playerRef         = useRef<{
         x: number;
         y: number;
         direction: "down" | "left" | "right" | "up";
@@ -177,7 +177,7 @@ export default function ArenaPage() {
         x: defaultSpawn.x,
         y: defaultSpawn.y,
         direction: "down",
-        frame: 0,
+        frame: 1, // Stopped standing pose (both feet planted)
     });
     const cameraRef         = useRef({ x: 0, y: 0 });
     const remotePlayersRef  = useRef<Map<string, RemotePlayer>>(new Map());
@@ -215,7 +215,7 @@ export default function ArenaPage() {
 
         const vw = canvas.width;
         const vh = canvas.height;
-        const dt = Math.min(timestamp - lastFrameTimeRef.current, 50);
+        const dt = lastFrameTimeRef.current > 0 ? Math.min(timestamp - lastFrameTimeRef.current, 50) : 16.67;
         lastFrameTimeRef.current = timestamp;
 
         const currentMap = mapRef.current;
@@ -241,8 +241,15 @@ export default function ArenaPage() {
             else if (vx < 0) player.direction = "left";
             else if (vx > 0) player.direction = "right";
 
-            const dx = vx * PLAYER_SPEED;
-            const dy = vy * PLAYER_SPEED;
+            // Compensate speed across browser zoom levels and delta-time so movement stays constant
+            const dtFactor = Math.min(Math.max(dt / (1000 / 60), 0.5), 2.5);
+            const currentDpr = window.devicePixelRatio || 1;
+            const baseDpr = initialDprRef.current || 1;
+            const zoomCompensation = Math.max(0.3, Math.min(3.0, baseDpr / currentDpr));
+            const effectiveSpeed = PLAYER_SPEED * dtFactor * zoomCompensation;
+
+            const dx = vx * effectiveSpeed;
+            const dy = vy * effectiveSpeed;
             const curFootX = player.x;
             const curFootY = player.y + FEET_OFFSET_Y;
 
@@ -254,15 +261,23 @@ export default function ArenaPage() {
                     moved = true;
                 } else {
                     const step = Math.sign(dx);
+                    const totalDist = Math.abs(dx);
                     let fx = curFootX;
-                    for (let s = 1; s <= Math.abs(dx); s++) {
+                    let advanced = 0;
+                    while (advanced + 1 <= totalDist) {
                         if (canMoveTo(fx + step, curFootY, currentMap, collisionRects)) {
                             fx += step;
                             player.x += step;
+                            advanced += 1;
                             moved = true;
                         } else {
                             break;
                         }
+                    }
+                    const rem = totalDist - advanced;
+                    if (rem > 0 && canMoveTo(fx + step * rem, curFootY, currentMap, collisionRects)) {
+                        player.x += step * rem;
+                        moved = true;
                     }
                 }
             }
@@ -276,21 +291,29 @@ export default function ArenaPage() {
                     moved = true;
                 } else {
                     const step = Math.sign(dy);
+                    const totalDist = Math.abs(dy);
                     let fy = curFootY;
-                    for (let s = 1; s <= Math.abs(dy); s++) {
+                    let advanced = 0;
+                    while (advanced + 1 <= totalDist) {
                         if (canMoveTo(updatedFootX, fy + step, currentMap, collisionRects)) {
                             fy += step;
                             player.y += step;
+                            advanced += 1;
                             moved = true;
                         } else {
                             break;
                         }
                     }
+                    const rem = totalDist - advanced;
+                    if (rem > 0 && canMoveTo(updatedFootX, fy + step * rem, currentMap, collisionRects)) {
+                        player.y += step * rem;
+                        moved = true;
+                    }
                 }
             }
         }
 
-        // Animate sprite frames when moving
+        // Animate sprite frames when moving; return to stopped standing frame (1) when idle
         if (moved) {
             animAccRef.current += dt;
             const mspf = 1000 / SPRITE_FPS;
@@ -300,7 +323,10 @@ export default function ArenaPage() {
                 onLocalPlayerMove(player.x, player.y, player.direction, player.frame);
             }
         } else {
-            player.frame = 0;
+            if (player.frame !== 1) {
+                player.frame = 1;
+                onLocalPlayerMove(player.x, player.y, player.direction, 1);
+            }
             animAccRef.current = 0;
         }
 

@@ -348,20 +348,20 @@
       1607,
       1607,
       0,
-      0,
       668,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
+      668,
+      668,
+      668,
+      668,
+      668,
+      668,
+      668,
+      668,
+      668,
+      668,
+      668,
+      668,
+      668,
       0,
       0,
       0,
@@ -414,19 +414,19 @@
       0,
       0,
       0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
       1607,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
+      1607,
+      1607,
+      1607,
+      1607,
+      1607,
+      1607,
+      1607,
+      1607,
+      1607,
+      1607,
+      1607,
+      1607,
       0,
       350,
       352,
@@ -592,7 +592,7 @@
       415,
       415,
       415,
-      0,
+      415,
       412,
       412,
       412,
@@ -607,12 +607,6 @@
       412,
       412,
       412,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
       0,
       0,
       0,
@@ -621,13 +615,19 @@
       0,
       0,
       415,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
+      415,
+      415,
+      415,
+      415,
+      415,
+      415,
+      415,
+      415,
+      415,
+      415,
+      415,
+      415,
+      415,
       415,
       415,
       415,
@@ -1567,7 +1567,7 @@
       0,
       0,
       0,
-      722,
+      0,
       722,
       722,
       722,
@@ -2451,457 +2451,229 @@
       "id": "wall-1",
       "elementId": "wall",
       "x": 608,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "wall-2",
       "elementId": "wall",
       "x": 576,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "wall-3",
       "elementId": "wall",
       "x": 544,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "wall-4",
       "elementId": "wall",
       "x": 512,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "wall-5",
       "elementId": "wall",
       "x": 480,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "wall-6",
       "elementId": "wall",
       "x": 448,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "wall-7",
       "elementId": "wall",
       "x": 416,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "wall-8",
       "elementId": "wall",
       "x": 352,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "wall-9",
       "elementId": "wall",
       "x": 320,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "wall-10",
       "elementId": "wall",
       "x": 288,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "wall-11",
       "elementId": "wall",
       "x": 256,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "wall-12",
       "elementId": "wall",
       "x": 224,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "wall-13",
       "elementId": "wall",
       "x": 192,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "wall-14",
       "elementId": "wall",
       "x": 192,
-      "y": 320,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 320
     },
     {
       "id": "wall-15",
       "elementId": "wall",
       "x": 224,
-      "y": 320,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 320
     },
     {
       "id": "wall-16",
       "elementId": "wall",
       "x": 256,
-      "y": 320,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 320
     },
     {
       "id": "wall-17",
       "elementId": "wall",
       "x": 288,
-      "y": 320,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 320
     },
     {
       "id": "wall-18",
       "elementId": "wall",
       "x": 320,
-      "y": 320,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 320
     },
     {
       "id": "wall-19",
       "elementId": "wall",
       "x": 352,
-      "y": 320,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 320
     },
     {
       "id": "wall-20",
       "elementId": "wall",
       "x": 416,
-      "y": 320,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 320
     },
     {
       "id": "wall-21",
       "elementId": "wall",
       "x": 448,
-      "y": 320,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 320
     },
     {
       "id": "wall-22",
       "elementId": "wall",
       "x": 480,
-      "y": 320,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 320
     },
     {
       "id": "wall-23",
       "elementId": "wall",
       "x": 512,
-      "y": 320,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 320
     },
     {
       "id": "wall-24",
       "elementId": "wall",
       "x": 544,
-      "y": 320,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 320
     },
     {
       "id": "wall-25",
       "elementId": "wall",
       "x": 576,
-      "y": 320,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 320
     },
     {
       "id": "wall-26",
       "elementId": "wall",
       "x": 640,
-      "y": 256,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 256
     },
     {
       "id": "wall-27",
       "elementId": "wall",
       "x": 704,
-      "y": 256,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 256
     },
     {
       "id": "wall-28",
       "elementId": "wall",
       "x": 736,
-      "y": 256,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 256
     },
     {
       "id": "wall-29",
       "elementId": "wall",
       "x": 768,
-      "y": 256,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 256
     },
     {
       "id": "wall-30",
       "elementId": "wall",
       "x": 800,
-      "y": 256,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 256
     },
     {
       "id": "wall-31",
       "elementId": "wall",
       "x": 832,
-      "y": 256,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 256
     },
     {
       "id": "wall-32",
       "elementId": "wall",
       "x": 864,
-      "y": 256,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 256
     },
     {
       "id": "wall-33",
       "elementId": "wall",
       "x": 896,
-      "y": 256,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 256
     },
     {
       "id": "wall-34",
       "elementId": "wall",
       "x": 928,
-      "y": 256,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 256
     },
     {
       "id": "wall-35",
       "elementId": "wall",
       "x": 960,
-      "y": 256,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 256
     },
     {
       "id": "wall-36",
       "elementId": "wall",
       "x": 992,
-      "y": 256,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 256
     },
     {
       "id": "wall-37",
       "elementId": "wall",
       "x": 1024,
-      "y": 256,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 256
     },
     {
       "id": "wall-38",
       "elementId": "wall",
       "x": 768,
-      "y": 448,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 448
     },
     {
       "id": "chair-39",
@@ -3591,1465 +3363,733 @@
       "id": "objectsoncollide-153",
       "elementId": "objectsoncollide",
       "x": 480,
-      "y": 640,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 640
     },
     {
       "id": "objectsoncollide-154",
       "elementId": "objectsoncollide",
       "x": 448,
-      "y": 640,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 640
     },
     {
       "id": "objectsoncollide-155",
       "elementId": "objectsoncollide",
       "x": 416,
-      "y": 640,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 640
     },
     {
       "id": "objectsoncollide-156",
       "elementId": "objectsoncollide",
       "x": 384,
-      "y": 640,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 640
     },
     {
       "id": "objectsoncollide-157",
       "elementId": "objectsoncollide",
       "x": 352,
-      "y": 640,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 640
     },
     {
       "id": "objectsoncollide-158",
       "elementId": "objectsoncollide",
       "x": 320,
-      "y": 640,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 640
     },
     {
       "id": "objectsoncollide-159",
       "elementId": "objectsoncollide",
       "x": 288,
-      "y": 640,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 640
     },
     {
       "id": "objectsoncollide-160",
       "elementId": "objectsoncollide",
       "x": 288,
-      "y": 672,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 672
     },
     {
       "id": "objectsoncollide-161",
       "elementId": "objectsoncollide",
       "x": 320,
-      "y": 672,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 672
     },
     {
       "id": "objectsoncollide-162",
       "elementId": "objectsoncollide",
       "x": 352,
-      "y": 672,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 672
     },
     {
       "id": "objectsoncollide-163",
       "elementId": "objectsoncollide",
       "x": 384,
-      "y": 672,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 672
     },
     {
       "id": "objectsoncollide-164",
       "elementId": "objectsoncollide",
       "x": 416,
-      "y": 672,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 672
     },
     {
       "id": "objectsoncollide-165",
       "elementId": "objectsoncollide",
       "x": 448,
-      "y": 672,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 672
     },
     {
       "id": "objectsoncollide-166",
       "elementId": "objectsoncollide",
       "x": 480,
-      "y": 672,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 672
     },
     {
       "id": "objectsoncollide-167",
       "elementId": "objectsoncollide",
       "x": 664,
-      "y": 129.333,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 129.333
     },
     {
       "id": "objectsoncollide-168",
       "elementId": "objectsoncollide",
       "x": 664,
-      "y": 161.333,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 161.333
     },
     {
       "id": "objectsoncollide-169",
       "elementId": "objectsoncollide",
       "x": 960,
-      "y": 96,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 96
     },
     {
       "id": "objectsoncollide-170",
       "elementId": "objectsoncollide",
       "x": 928,
-      "y": 96,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 96
     },
     {
       "id": "objectsoncollide-171",
       "elementId": "objectsoncollide",
       "x": 928,
-      "y": 160,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 160
     },
     {
       "id": "objectsoncollide-172",
       "elementId": "objectsoncollide",
       "x": 928,
-      "y": 192,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 192
     },
     {
       "id": "objectsoncollide-173",
       "elementId": "objectsoncollide",
       "x": 960,
-      "y": 192,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 192
     },
     {
       "id": "objectsoncollide-174",
       "elementId": "objectsoncollide",
       "x": 928,
-      "y": 128,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 128
     },
     {
       "id": "objectsoncollide-175",
       "elementId": "objectsoncollide",
       "x": 832,
-      "y": 864,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 864
     },
     {
       "id": "objectsoncollide-176",
       "elementId": "objectsoncollide",
       "x": 800,
-      "y": 864,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 864
     },
     {
       "id": "objectsoncollide-177",
       "elementId": "objectsoncollide",
       "x": 1216,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-178",
       "elementId": "objectsoncollide",
       "x": 1184,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-179",
       "elementId": "objectsoncollide",
       "x": 1152,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-180",
       "elementId": "objectsoncollide",
       "x": 1216,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-181",
       "elementId": "objectsoncollide",
       "x": 1184,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-182",
       "elementId": "objectsoncollide",
       "x": 1216,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-183",
       "elementId": "objectsoncollide",
       "x": 1184,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-184",
       "elementId": "objectsoncollide",
       "x": 1152,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-185",
       "elementId": "objectsoncollide",
       "x": 1152,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-186",
       "elementId": "objectsoncollide",
       "x": 1056,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-187",
       "elementId": "objectsoncollide",
       "x": 1088,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-188",
       "elementId": "objectsoncollide",
       "x": 1120,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-189",
       "elementId": "objectsoncollide",
       "x": 1120,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-190",
       "elementId": "objectsoncollide",
       "x": 1120,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-191",
       "elementId": "objectsoncollide",
       "x": 1088,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-192",
       "elementId": "objectsoncollide",
       "x": 1056,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-193",
       "elementId": "objectsoncollide",
       "x": 1088,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-194",
       "elementId": "objectsoncollide",
       "x": 1056,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-195",
       "elementId": "objectsoncollide",
       "x": 1024,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-196",
       "elementId": "objectsoncollide",
       "x": 1024,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-197",
       "elementId": "objectsoncollide",
       "x": 992,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-198",
       "elementId": "objectsoncollide",
       "x": 992,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-199",
       "elementId": "objectsoncollide",
       "x": 960,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-200",
       "elementId": "objectsoncollide",
       "x": 960,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-201",
       "elementId": "objectsoncollide",
       "x": 1216,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-202",
       "elementId": "objectsoncollide",
       "x": 1184,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-203",
       "elementId": "objectsoncollide",
       "x": 1152,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-204",
       "elementId": "objectsoncollide",
       "x": 1216,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-205",
       "elementId": "objectsoncollide",
       "x": 1184,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-206",
       "elementId": "objectsoncollide",
       "x": 1152,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-207",
       "elementId": "objectsoncollide",
       "x": 1216,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-208",
       "elementId": "objectsoncollide",
       "x": 1216,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-209",
       "elementId": "objectsoncollide",
       "x": 1120,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-210",
       "elementId": "objectsoncollide",
       "x": 1120,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-211",
       "elementId": "objectsoncollide",
       "x": 1088,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-212",
       "elementId": "objectsoncollide",
       "x": 1056,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-213",
       "elementId": "objectsoncollide",
       "x": 1056,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-214",
       "elementId": "objectsoncollide",
       "x": 1088,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-215",
       "elementId": "objectsoncollide",
       "x": 1024,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-216",
       "elementId": "objectsoncollide",
       "x": 992,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-217",
       "elementId": "objectsoncollide",
       "x": 960,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 480
     },
     {
       "id": "objectsoncollide-218",
       "elementId": "objectsoncollide",
       "x": 1024,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-219",
       "elementId": "objectsoncollide",
       "x": 992,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-220",
       "elementId": "objectsoncollide",
       "x": 960,
-      "y": 512,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 512
     },
     {
       "id": "objectsoncollide-221",
       "elementId": "objectsoncollide",
       "x": 1216,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-222",
       "elementId": "objectsoncollide",
       "x": 1184,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-223",
       "elementId": "objectsoncollide",
       "x": 1152,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-224",
       "elementId": "objectsoncollide",
       "x": 1120,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-225",
       "elementId": "objectsoncollide",
       "x": 1088,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-226",
       "elementId": "objectsoncollide",
       "x": 1056,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-227",
       "elementId": "objectsoncollide",
       "x": 1024,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-228",
       "elementId": "objectsoncollide",
       "x": 992,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-229",
       "elementId": "objectsoncollide",
       "x": 960,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-230",
       "elementId": "objectsoncollide",
       "x": 1216,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-231",
       "elementId": "objectsoncollide",
       "x": 1184,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-232",
       "elementId": "objectsoncollide",
       "x": 1216,
-      "y": 768,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 768
     },
     {
       "id": "objectsoncollide-233",
       "elementId": "objectsoncollide",
       "x": 1184,
-      "y": 768,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 768
     },
     {
       "id": "objectsoncollide-234",
       "elementId": "objectsoncollide",
       "x": 1152,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-235",
       "elementId": "objectsoncollide",
       "x": 1152,
-      "y": 768,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 768
     },
     {
       "id": "objectsoncollide-236",
       "elementId": "objectsoncollide",
       "x": 1120,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-237",
       "elementId": "objectsoncollide",
       "x": 1024,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-238",
       "elementId": "objectsoncollide",
       "x": 1120,
-      "y": 768,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 768
     },
     {
       "id": "objectsoncollide-239",
       "elementId": "objectsoncollide",
       "x": 1024,
-      "y": 768,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 768
     },
     {
       "id": "objectsoncollide-240",
       "elementId": "objectsoncollide",
       "x": 1088,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-241",
       "elementId": "objectsoncollide",
       "x": 992,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-242",
       "elementId": "objectsoncollide",
       "x": 1088,
-      "y": 768,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 768
     },
     {
       "id": "objectsoncollide-243",
       "elementId": "objectsoncollide",
       "x": 992,
-      "y": 768,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 768
     },
     {
       "id": "objectsoncollide-244",
       "elementId": "objectsoncollide",
       "x": 1056,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-245",
       "elementId": "objectsoncollide",
       "x": 960,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-246",
       "elementId": "objectsoncollide",
       "x": 1056,
-      "y": 768,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 768
     },
     {
       "id": "objectsoncollide-247",
       "elementId": "objectsoncollide",
       "x": 960,
-      "y": 768,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 768
     },
     {
       "id": "objectsoncollide-248",
       "elementId": "objectsoncollide",
       "x": 1216,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-249",
       "elementId": "objectsoncollide",
       "x": 1184,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-250",
       "elementId": "objectsoncollide",
       "x": 1152,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-251",
       "elementId": "objectsoncollide",
       "x": 1216,
-      "y": 768,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 768
     },
     {
       "id": "objectsoncollide-252",
       "elementId": "objectsoncollide",
       "x": 1184,
-      "y": 768,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 768
     },
     {
       "id": "objectsoncollide-253",
       "elementId": "objectsoncollide",
       "x": 1152,
-      "y": 768,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 768
     },
     {
       "id": "objectsoncollide-254",
       "elementId": "objectsoncollide",
       "x": 1024,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-255",
       "elementId": "objectsoncollide",
       "x": 992,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-256",
       "elementId": "objectsoncollide",
       "x": 960,
-      "y": 736,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 736
     },
     {
       "id": "objectsoncollide-257",
       "elementId": "objectsoncollide",
       "x": 960,
-      "y": 768,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 768
     },
     {
       "id": "objectsoncollide-258",
       "elementId": "objectsoncollide",
       "x": 992,
-      "y": 768,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 768
     },
     {
       "id": "objectsoncollide-259",
       "elementId": "objectsoncollide",
       "x": 1024,
-      "y": 768,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 768
     },
     {
       "id": "objectsoncollide-260",
       "elementId": "objectsoncollide",
       "x": 632,
-      "y": 129.333,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 129.333
     },
     {
       "id": "objectsoncollide-261",
       "elementId": "objectsoncollide",
       "x": 632,
-      "y": 161.333,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 161.333
     },
     {
       "id": "objectsoncollide-262",
       "elementId": "objectsoncollide",
       "x": 800,
-      "y": 896,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 896
     },
     {
       "id": "objectsoncollide-263",
       "elementId": "objectsoncollide",
       "x": 832,
-      "y": 896,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 896
     },
     {
       "id": "objectsoncollide-264",
       "elementId": "objectsoncollide",
       "x": 192,
-      "y": 544,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 544
     },
     {
       "id": "objectsoncollide-265",
       "elementId": "objectsoncollide",
       "x": 224,
-      "y": 544,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 544
     },
     {
       "id": "objectsoncollide-266",
       "elementId": "objectsoncollide",
       "x": 800,
-      "y": 320,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 320
     },
     {
       "id": "objectsoncollide-267",
       "elementId": "objectsoncollide",
       "x": 1024,
-      "y": 96,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 96
     },
     {
       "id": "objectsoncollide-268",
       "elementId": "objectsoncollide",
       "x": 1024,
-      "y": 320,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 320
     },
     {
       "id": "objectsoncollide-269",
       "elementId": "objectsoncollide",
       "x": 1056,
-      "y": 320,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 320
     },
     {
       "id": "objectsoncollide-270",
       "elementId": "objectsoncollide",
       "x": 1216,
-      "y": 320,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 320
     },
     {
       "id": "objectsoncollide-271",
       "elementId": "objectsoncollide",
       "x": 192,
-      "y": 384,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 384
     },
     {
       "id": "objectsoncollide-272",
       "elementId": "objectsoncollide",
       "x": 320,
-      "y": 384,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 384
     },
     {
       "id": "objectsoncollide-273",
       "elementId": "objectsoncollide",
       "x": 448,
-      "y": 384,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 384
     },
     {
       "id": "objectsoncollide-274",
       "elementId": "objectsoncollide",
       "x": 576,
-      "y": 192,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 192
     },
     {
       "id": "genericobjects-275",
@@ -5139,61 +4179,31 @@
       "id": "genericobjectsoncollide-289",
       "elementId": "genericobjectsoncollide",
       "x": 736,
-      "y": 96,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 96
     },
     {
       "id": "genericobjectsoncollide-290",
       "elementId": "genericobjectsoncollide",
       "x": 1216,
-      "y": 864,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 864
     },
     {
       "id": "genericobjectsoncollide-291",
       "elementId": "genericobjectsoncollide",
       "x": 1216,
-      "y": 896,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 896
     },
     {
       "id": "genericobjectsoncollide-292",
       "elementId": "genericobjectsoncollide",
       "x": 1152,
-      "y": 896,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 896
     },
     {
       "id": "genericobjectsoncollide-293",
       "elementId": "genericobjectsoncollide",
       "x": 1184,
-      "y": 896,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "y": 896
     },
     {
       "id": "computer-294",
@@ -5229,37 +4239,19 @@
       "id": "whiteboard-299",
       "elementId": "whiteboard",
       "x": 928,
-      "y": 256,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 64,
-        "height": 64
-      }
+      "y": 256
     },
     {
       "id": "whiteboard-300",
       "elementId": "whiteboard",
       "x": 832,
-      "y": 32,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 64,
-        "height": 64
-      }
+      "y": 32
     },
     {
       "id": "whiteboard-301",
       "elementId": "whiteboard",
       "x": 512,
-      "y": 480,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 64,
-        "height": 64
-      }
+      "y": 480
     },
     {
       "id": "basement-302",
@@ -5403,13 +4395,7 @@
       "id": "vendingmachine-325",
       "elementId": "vendingmachine",
       "x": 378,
-      "y": 137,
-      "collision": {
-        "x": 0,
-        "y": 0,
-        "width": 48,
-        "height": 72
-      }
+      "y": 137
     }
   ],
   "spawnPoints": [
