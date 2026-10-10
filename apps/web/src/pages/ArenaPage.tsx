@@ -84,7 +84,47 @@ function drawGround(
     }
 }
 
-const FOREGROUND_LAYERS = new Set(["objectsoncollide", "genericobjectsoncollide", "vendingmachine"]);
+const LAYER_PRIORITY: Record<string, number> = {
+    wall: 100,
+    chair: 20,
+    objects: 30,
+    objectsoncollide: 40,
+    genericobjects: 50,
+    genericobjectsoncollide: 60,
+    basement: 65,
+    computer: 70,
+    whiteboard: 75,
+    vendingmachine: 80,
+};
+
+function checkNearSittable(
+    footX: number,
+    footY: number,
+    elements: MapElement[]
+): boolean {
+    const PROXIMITY_THRESHOLD = 54;
+    for (const el of elements) {
+        const layer = (el.layerName ?? el.elementId).toLowerCase();
+        const isSittable =
+            layer === "chair" ||
+            layer === "computer" ||
+            layer === "objectsoncollide" ||
+            layer === "genericobjectsoncollide" ||
+            (layer === "basement" && el.id.startsWith("basement-119")) ||
+            layer === "genericobjects";
+        if (!isSittable) continue;
+
+        const w = el.width ?? 32;
+        const h = el.height ?? 32;
+        const dx = Math.max(el.x - footX, 0, footX - (el.x + w));
+        const dy = Math.max(el.y - footY, 0, footY - (el.y + h));
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist <= PROXIMITY_THRESHOLD) {
+            return true;
+        }
+    }
+    return false;
+}
 
 function resolveTilesetUrl(imagePath: string): string {
     if (imagePath.startsWith("/assets/")) return imagePath;
@@ -248,6 +288,10 @@ export default function ArenaPage() {
         mapRef.current = map;
         collisionRectsRef.current = buildCollisionRectangles(map);
     }, [map]);
+
+    // ── Proximity prompt state: "Press E to sit" (Spec 09) ─────────────────
+    const [nearSittable, setNearSittable] = useState<boolean>(false);
+    const nearSittableRef = useRef<boolean>(false);
 
     // ── Canvas ref ────────────────────────────────────────────────────────
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -464,43 +508,168 @@ export default function ArenaPage() {
             );
         }
 
-        // ── Render background / lower layer map elements ──────────────────
-        if (currentMap.tilesets && assets.tilesetImages) {
-            const bgElements = currentMap.elements.filter(
-                (el) => !FOREGROUND_LAYERS.has((el.layerName ?? el.elementId).toLowerCase())
-            );
-            for (const el of bgElements) {
-                drawElement(ctx, el, currentMap.tilesets, assets.tilesetImages, camera.x, camera.y, vw, vh);
-            }
+        // ── Check proximity to sittable objects (tables, sofas, chairs, computers) ──
+        const curFootX = player.x;
+        const curFootY = player.y + FEET_OFFSET_Y;
+        const isNear = checkNearSittable(curFootX, curFootY, currentMap.elements);
+        if (isNear !== nearSittableRef.current) {
+            nearSittableRef.current = isNear;
+            setNearSittable(isNear);
         }
 
-        // ── Remote players ────────────────────────────────────────────────
-        const sprites: Record<string, HTMLImageElement | undefined> = {
-            down:  assets.spriteDown,
-            left:  assets.spriteLeft,
-            right: assets.spriteRight,
-            up:    assets.spriteUp,
-        };
-
-        remotePlayersRef.current.forEach((rp) => {
-            const sx = rp.x - camera.x;
-            const sy = rp.y - camera.y;
-            if (sx < -96 || sx > vw + 96 || sy < -96 || sy > vh + 96) return;
-            drawPlayer(ctx, sprites, sx, sy, rp.direction, rp.frame, rp.displayName, false);
-        });
-
-        // ── Local player (rendered at full unzoomed avatar size) ───────────
-        const localSx = player.x - camera.x;
-        const localSy = player.y - camera.y;
-        drawPlayer(ctx, sprites, localSx, localSy, player.direction, player.frame, displayName, true);
-
-        // ── Render foreground / collide layer map elements ────────────────
+        // ── Render all physical entities (elements + players) sorted by Depth Y ──
         if (currentMap.tilesets && assets.tilesetImages) {
-            const fgElements = currentMap.elements.filter(
-                (el) => FOREGROUND_LAYERS.has((el.layerName ?? el.elementId).toLowerCase())
-            );
-            for (const el of fgElements) {
-                drawElement(ctx, el, currentMap.tilesets, assets.tilesetImages, camera.x, camera.y, vw, vh);
+            const sprites: Record<string, HTMLImageElement | undefined> = {
+                down:  assets.spriteDown,
+                left:  assets.spriteLeft,
+                right: assets.spriteRight,
+                up:    assets.spriteUp,
+            };
+
+            type RenderEntity =
+                | {
+                      kind: "element";
+                      depthY: number;
+                      priority: number;
+                      element: MapElement;
+                  }
+                | {
+                      kind: "player";
+                      depthY: number;
+                      priority: number;
+                      player: {
+                          sx: number;
+                          sy: number;
+                          direction: "down" | "left" | "right" | "up";
+                          frame: number;
+                          displayName: string;
+                          isLocal: boolean;
+                      };
+                  };
+
+            const entities: RenderEntity[] = [];
+
+            // 1. Visible map elements
+            for (const el of currentMap.elements) {
+                const elW = el.width ?? 32;
+                const elH = el.height ?? 32;
+                if (el.x + elW < camera.x || el.x > camera.x + vw || el.y + elH < camera.y || el.y > camera.y + vh) {
+                    continue;
+                }
+                const layer = (el.layerName ?? el.elementId).toLowerCase();
+                const priority = LAYER_PRIORITY[layer] ?? 30;
+                entities.push({
+                    kind: "element",
+                    depthY: el.y + elH,
+                    priority,
+                    element: el,
+                });
+            }
+
+            // 2. Remote players
+            remotePlayersRef.current.forEach((rp) => {
+                const sx = rp.x - camera.x;
+                const sy = rp.y - camera.y;
+                if (sx < -96 || sx > vw + 96 || sy < -96 || sy > vh + 96) return;
+                entities.push({
+                    kind: "player",
+                    depthY: rp.y + FEET_OFFSET_Y,
+                    priority: 45,
+                    player: {
+                        sx,
+                        sy,
+                        direction: rp.direction,
+                        frame: rp.frame,
+                        displayName: rp.displayName,
+                        isLocal: false,
+                    },
+                });
+            });
+
+            // 3. Local player
+            const localSx = player.x - camera.x;
+            const localSy = player.y - camera.y;
+            entities.push({
+                kind: "player",
+                depthY: curFootY,
+                priority: 45,
+                player: {
+                    sx: localSx,
+                    sy: localSy,
+                    direction: player.direction,
+                    frame: player.frame,
+                    displayName,
+                    isLocal: true,
+                },
+            });
+
+            // Depth sort: primary key depthY, secondary key layer priority
+            entities.sort((a, b) => {
+                if (a.depthY !== b.depthY) {
+                    return a.depthY - b.depthY;
+                }
+                return a.priority - b.priority;
+            });
+
+            // Draw all entities in depth sorted order
+            for (const entity of entities) {
+                if (entity.kind === "element") {
+                    drawElement(ctx, entity.element, currentMap.tilesets, assets.tilesetImages, camera.x, camera.y, vw, vh);
+                } else {
+                    const p = entity.player;
+                    drawPlayer(ctx, sprites, p.sx, p.sy, p.direction, p.frame, p.displayName, p.isLocal);
+                }
+            }
+
+            // Floating sit prompt popup on canvas above local avatar (Spec 09)
+            if (isNear) {
+                ctx.save();
+                const promptText = "Press E to sit";
+                ctx.font = "bold 13px 'Inter', system-ui, sans-serif";
+                const ptw = ctx.measureText(promptText).width;
+                const promptW = ptw + 36;
+                const promptH = 26;
+                const promptX = localSx - promptW / 2;
+                const promptY = localSy - 48 - promptH - 8;
+
+                // White popup container
+                ctx.fillStyle = "#ffffff";
+                ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
+                ctx.shadowBlur = 12;
+                ctx.shadowOffsetY = 3;
+                ctx.beginPath();
+                ctx.roundRect(promptX, promptY, promptW, promptH, 8);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetY = 0;
+
+                // Border
+                ctx.strokeStyle = "rgba(0, 0, 0, 0.12)";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // [E] keycap
+                const keyX = promptX + 5;
+                const keyY = promptY + 4;
+                const keySize = 18;
+                ctx.fillStyle = "#0f172a";
+                ctx.beginPath();
+                ctx.roundRect(keyX, keyY, keySize, keySize, 4);
+                ctx.fill();
+
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 11px monospace";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("E", keyX + keySize / 2, keyY + keySize / 2);
+
+                // Text label
+                ctx.fillStyle = "#0f172a";
+                ctx.font = "bold 12px 'Inter', system-ui, sans-serif";
+                ctx.textAlign = "left";
+                ctx.textBaseline = "middle";
+                ctx.fillText("Press E to sit", keyX + keySize + 6, promptY + promptH / 2);
+                ctx.restore();
             }
         }
 
@@ -878,6 +1047,52 @@ export default function ArenaPage() {
             >
                 WASD / Arrow keys to move
             </div>
+
+            {/* ── Proximity prompt: "Press E to sit" (Spec 09) ─── */}
+            {nearSittable && (
+                <div
+                    style={{
+                        position: "absolute",
+                        bottom: 24,
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        padding: "8px 18px",
+                        borderRadius: 9999,
+                        background: "#ffffff",
+                        border: "1px solid rgba(0, 0, 0, 0.12)",
+                        boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.35), 0 8px 10px -6px rgba(0, 0, 0, 0.2)",
+                        color: "#0f172a",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        userSelect: "none",
+                        pointerEvents: "none",
+                        zIndex: 50,
+                        letterSpacing: "0.02em",
+                    }}
+                >
+                    <span
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: 22,
+                            height: 22,
+                            borderRadius: 4,
+                            background: "#0f172a",
+                            color: "#ffffff",
+                            fontFamily: "monospace",
+                            fontWeight: 800,
+                            fontSize: 11,
+                        }}
+                    >
+                        E
+                    </span>
+                    <span>Press E to sit</span>
+                </div>
+            )}
         </div>
     );
 }
