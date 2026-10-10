@@ -97,16 +97,20 @@ const LAYER_PRIORITY: Record<string, number> = {
     vendingmachine: 80,
 };
 
-function checkNearSittable(
+function findNearestSittable(
     footX: number,
     footY: number,
     elements: MapElement[]
-): boolean {
-    const PROXIMITY_THRESHOLD = 54;
+): MapElement | null {
+    const PROXIMITY_THRESHOLD = 58;
+    let closest: MapElement | null = null;
+    let minDist = Infinity;
+
     for (const el of elements) {
         const layer = (el.layerName ?? el.elementId).toLowerCase();
+        const isChair = layer === "chair";
         const isSittable =
-            layer === "chair" ||
+            isChair ||
             layer === "computer" ||
             layer === "objectsoncollide" ||
             layer === "genericobjectsoncollide" ||
@@ -119,11 +123,15 @@ function checkNearSittable(
         const dx = Math.max(el.x - footX, 0, footX - (el.x + w));
         const dy = Math.max(el.y - footY, 0, footY - (el.y + h));
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist <= PROXIMITY_THRESHOLD) {
-            return true;
+
+        // Prefer chairs when both chair and table are within proximity
+        const score = isChair ? dist * 0.75 : dist;
+        if (dist <= PROXIMITY_THRESHOLD && score < minDist) {
+            minDist = score;
+            closest = el;
         }
     }
-    return false;
+    return closest;
 }
 
 function resolveTilesetUrl(imagePath: string): string {
@@ -288,10 +296,6 @@ export default function ArenaPage() {
         mapRef.current = map;
         collisionRectsRef.current = buildCollisionRectangles(map);
     }, [map]);
-
-    // ── Proximity prompt state: "Press E to sit" (Spec 09) ─────────────────
-    const [nearSittable, setNearSittable] = useState<boolean>(false);
-    const nearSittableRef = useRef<boolean>(false);
 
     // ── Canvas ref ────────────────────────────────────────────────────────
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -511,11 +515,7 @@ export default function ArenaPage() {
         // ── Check proximity to sittable objects (tables, sofas, chairs, computers) ──
         const curFootX = player.x;
         const curFootY = player.y + FEET_OFFSET_Y;
-        const isNear = checkNearSittable(curFootX, curFootY, currentMap.elements);
-        if (isNear !== nearSittableRef.current) {
-            nearSittableRef.current = isNear;
-            setNearSittable(isNear);
-        }
+        const nearestSittable = findNearestSittable(curFootX, curFootY, currentMap.elements);
 
         // ── Render all physical entities (elements + players) sorted by Depth Y ──
         if (currentMap.tilesets && assets.tilesetImages) {
@@ -621,25 +621,50 @@ export default function ArenaPage() {
                 }
             }
 
-            // Floating sit prompt popup on canvas above local avatar (Spec 09)
-            if (isNear) {
+            // Floating sit prompt popup on canvas directly at the nearest table or chair
+            if (nearestSittable) {
                 ctx.save();
                 const promptText = "Press E to sit";
                 ctx.font = "bold 13px 'Inter', system-ui, sans-serif";
                 const ptw = ctx.measureText(promptText).width;
-                const promptW = ptw + 36;
+                const promptW = ptw + 34;
                 const promptH = 26;
-                const promptX = localSx - promptW / 2;
-                const promptY = localSy - 48 - promptH - 8;
+
+                const elemW = nearestSittable.width ?? 32;
+                const elemH = nearestSittable.height ?? 32;
+                const elemSx = nearestSittable.x - camera.x;
+                const elemSy = nearestSittable.y - camera.y;
+                const elemCenterX = elemSx + elemW / 2;
+
+                // Position label just after the element on the side the player is standing
+                const isPlayerBelow = curFootY > nearestSittable.y + elemH / 2;
+                const promptY = isPlayerBelow ? elemSy + elemH + 6 : elemSy - promptH - 6;
+                const promptX = Math.max(8, Math.min(vw - promptW - 8, elemCenterX - promptW / 2));
+                const arrowX = Math.max(promptX + 12, Math.min(promptX + promptW - 12, elemCenterX));
 
                 // White popup container
                 ctx.fillStyle = "#ffffff";
-                ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
-                ctx.shadowBlur = 12;
-                ctx.shadowOffsetY = 3;
+                ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+                ctx.shadowBlur = 10;
+                ctx.shadowOffsetY = 2;
                 ctx.beginPath();
                 ctx.roundRect(promptX, promptY, promptW, promptH, 8);
                 ctx.fill();
+
+                // Small indicator pointer arrow connecting label to element
+                ctx.beginPath();
+                if (isPlayerBelow) {
+                    ctx.moveTo(arrowX - 5, promptY);
+                    ctx.lineTo(arrowX + 5, promptY);
+                    ctx.lineTo(arrowX, promptY - 5);
+                } else {
+                    ctx.moveTo(arrowX - 5, promptY + promptH);
+                    ctx.lineTo(arrowX + 5, promptY + promptH);
+                    ctx.lineTo(arrowX, promptY + promptH + 5);
+                }
+                ctx.closePath();
+                ctx.fill();
+
                 ctx.shadowBlur = 0;
                 ctx.shadowOffsetY = 0;
 
@@ -1047,52 +1072,6 @@ export default function ArenaPage() {
             >
                 WASD / Arrow keys to move
             </div>
-
-            {/* ── Proximity prompt: "Press E to sit" (Spec 09) ─── */}
-            {nearSittable && (
-                <div
-                    style={{
-                        position: "absolute",
-                        bottom: 24,
-                        left: "50%",
-                        transform: "translateX(-50%)",
-                        padding: "8px 18px",
-                        borderRadius: 9999,
-                        background: "#ffffff",
-                        border: "1px solid rgba(0, 0, 0, 0.12)",
-                        boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.35), 0 8px 10px -6px rgba(0, 0, 0, 0.2)",
-                        color: "#0f172a",
-                        fontSize: 13,
-                        fontWeight: 700,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        userSelect: "none",
-                        pointerEvents: "none",
-                        zIndex: 50,
-                        letterSpacing: "0.02em",
-                    }}
-                >
-                    <span
-                        style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 22,
-                            height: 22,
-                            borderRadius: 4,
-                            background: "#0f172a",
-                            color: "#ffffff",
-                            fontFamily: "monospace",
-                            fontWeight: 800,
-                            fontSize: 11,
-                        }}
-                    >
-                        E
-                    </span>
-                    <span>Press E to sit</span>
-                </div>
-            )}
         </div>
     );
 }
