@@ -1,54 +1,35 @@
+# Space Lobby & Real‑time Arena
 
-```
-User opens a space
-  ↓
-Space lobby
-  ↓
-Select avatar + enter display name
-  ↓
-Join arena
-  ↓
-WebSocket broadcasts presence and position
-```
+A lightweight real‑time system that lets users:
 
-Use two kinds of data:
+1. **Enter a space lobby**  
+2. **Choose an avatar and a display name**  
+3. **Join an arena** where their presence and movements are broadcast to all other players via WebSocket.
 
-### Persistent data
+## Architecture
 
-Store these in PostgreSQL:
+- **Persistent data** – stored in PostgreSQL  
+  - `Avatar(id, name, imageUrl)` – Cloudinary URLs for avatar images.  
+  - `User(id, avatarId?, name?)` – Optional default avatar and global display name.
 
-```
-Avatar
-- id
-- name
-- imageUrl      ← Cloudinary URL
+- **Temporary arena data** – kept in memory on the WebSocket server  
+  ```ts
+  type ConnectedPlayer = {
+    userId: string;
+    socketId: string;
+    spaceId: string;
+    displayName: string;
+    avatarId: string;
+    x: number;
+    y: number;
+  };
+  ```
 
-User
-- avatarId      ← optional default avatar
-- name          ← optional global display name
-```
+## WebSocket Message Flow
 
-The admin uploads avatar images to Cloudinary, then saves the Cloudinary URL in the `Avatar` table.
-
-### Temporary arena data
-
-Store these in WebSocket server memory:
-
-```
-type ConnectedPlayer = {
-  userId: string;
-  socketId: string;
-  spaceId: string;
-  displayName: string;
-  avatarId: string;
-  x: number;
-  y: number;
-};
-```
-
-When a user joins:
-
-```
+### Join a space
+Client sends:
+```json
 {
   "type": "join-space",
   "spaceId": "space-id",
@@ -57,18 +38,17 @@ When a user joins:
 }
 ```
 
-The WebSocket server should then:
+Server actions:
 
-1. Validate the user’s session.
-2. Verify that the space exists.
-3. Verify that the avatar exists.
-4. Add the player to the in-memory room.
-5. Send the current players to the new user.
-6. Broadcast the new player to everyone else.
+1. Validate the user’s session.  
+2. Verify the space exists.  
+3. Verify the avatar exists.  
+4. Add the player to the in‑memory room.  
+5. Send the current player list to the newcomer.  
+6. Broadcast a `player-joined` event to everyone else.
 
-Example broadcast:
-
-```
+Broadcast example:
+```json
 {
   "type": "player-joined",
   "player": {
@@ -81,9 +61,9 @@ Example broadcast:
 }
 ```
 
-When the player moves:
-
-```
+### Move a player
+Client sends:
+```json
 {
   "type": "player-moved",
   "x": 240,
@@ -91,23 +71,15 @@ When the player moves:
 }
 ```
 
-The server should validate movement and broadcast the updated position.
+Server validates the movement and broadcasts the updated position to other players.
 
-For your first version, keeping display name and selected avatar in memory is fine. They disappear when the user disconnects, which is normal for temporary presence data.
+## Persistence vs. Session Data
 
-Later, if you want each user to have a saved default avatar or display name, update:
+- **Persistent** (`Avatar`, `User`) – survives restarts, managed via PostgreSQL.  
+- **Session‑only** (`ConnectedPlayer`) – lives only while the socket is open; disappears on disconnect.
 
-```
-User.avatarId
-User.name
-```
+Future enhancements may store default avatars/display names in `User.avatarId` and `User.name`, or add a `SpaceMember` table for persistent memberships, saved positions, bans, etc.
 
-A useful distinction:
+---
 
-```
-User.avatarId       = user's default avatar
-Join payload avatar = avatar chosen for this session
-WebSocket memory    = current avatar/display name/position
-```
-
-You only need a database table such as `SpaceMember` later if you want persistent membership, saved player positions, private spaces, bans, or space-specific display names.
+*This README provides a high‑level overview. Implementation details (database schema, server setup, authentication) are left for the codebase.*```
