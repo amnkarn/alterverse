@@ -137,6 +137,8 @@ export function scaleGameMap(rawMap: GameMap, scale: number): GameMap {
             ...el,
             x: Math.round(el.x * tileScale),
             y: Math.round(el.y * tileScale),
+            width: el.width !== undefined ? Math.round(el.width * tileScale) : undefined,
+            height: el.height !== undefined ? Math.round(el.height * tileScale) : undefined,
             collision: el.collision
                 ? {
                       x: Math.round(el.collision.x * tileScale),

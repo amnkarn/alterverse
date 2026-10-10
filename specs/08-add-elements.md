@@ -1,137 +1,197 @@
-## Add elements on map
+# Add elements to the arena map
 
-For your current demo:
+## Objective
 
-1. Use `Interiors_free_32x32.png` as one main tileset.
-2. Create a tileset in Tiled from that image.
-3. Build a small clean demo map with it.
-4. Add a collision property to solid tiles.
-5. Add elements through Tiled object/tile layers.
-6. Export the map.
-7. Make the frontend render that exported map.
+Add chairs, tables, trees, computers, whiteboards, vending machines, and other objects to the arena map while preserving the map’s Tiled coordinates, tileset GIDs, render order, and collision behavior.
 
+## Source of truth
 
-# instruction:
+Use Tiled as the map editor and source of truth.
 
-```
-Use this single tileset for the demo map:
-
-Image:
-apps/web/public/assets/modern_tiles/Interiors_free/32x32/Interiors_free_32x32.png
-
-Image dimensions:
-512x2848
-
-Tile dimensions:
-32x32
-
-Columns:
-16
-
-Rows:
-89
-
-Use tileId to calculate the source rectangle:
-sourceX = (tileId % 16) * 32
-sourceY = floor(tileId / 16) * 32
-
-Do not search for separate chair, tree, table, or computer PNG files.
-All objects must be rendered from this atlas.
-
-Use Tiled map coordinates in world pixels.
-Use tile properties named `collides` for collision.
-Add a debug mode showing tile IDs and collision rectangles.
+```text
+Editable map: apps/web/public/assets/map/map.tmx
+Runtime export: apps/web/public/assets/map/map.json
 ```
 
-So no, separate image files are not required. The only requirement is that the atlas tile positions are known and the map uses the same tileset metadata consistently.
+Do not edit the large exported `map.json` tile arrays manually. Do not create another custom map format.
 
+After changing the map:
 
+1. Open `map.tmx` in Tiled.
+2. Add or move the element in the correct layer.
+3. Configure collision properties or collision objects.
+4. Save the `.tmx` file.
+5. Export the map to `map.json`.
+6. Confirm all referenced images load from `apps/web/public`.
 
-# For your image:
+## Map coordinate system
 
-```
-Image: 512x2848
-Tile size: 32x32
+The current map uses:
 
-Columns = 512 / 32 = 16
-Rows = 2848 / 32 = 89
-```
-
-So the atlas configuration is always:
-
-```
-const tileSize = 32;
-const columns = 16;
-const rows = 89;
-```
-
-For a tile ID:
-
-```
-const sourceX = (tileId % columns) * tileSize;
-const sourceY = Math.floor(tileId / columns) * tileSize;
+```text
+Map size: 40 columns x 30 rows
+Base tile size: 32x32 pixels
+World size: 1280x960 pixels
 ```
 
-These are the coordinates inside the image.
+Tiled object positions are world-pixel coordinates:
 
-There are two different positions:
-
+```text
+worldX = tileColumn * 32
+worldY = tileRow * 32
 ```
-sourceX/sourceY
-  = where the image is located inside the atlas
 
-destinationX/destinationY
-  = where the element is placed inside the game map
+For example, tile column `8`, row `6` means:
+
+```text
+x = 256
+y = 192
+```
+
+## Tilesets
+
+The map uses multiple tilesets. Never render every GID using `FloorAndGround.png`.
+
+| Tileset | First GID | Image | Tile size | Columns |
+|---|---:|---|---:|---:|
+| FloorAndGround | 1 | `FloorAndGround.png` | 32x32 | 64 |
+| chair | 2561 | `chair.png` | 32x64 | 1 |
+| Modern Office | 2584 | `Modern_Office_Black_Shadow.png` | 32x32 | 16 |
+| Generic | 3432 | `Generic.png` | 32x32 | 16 |
+| computer | 4680 | `computer.png` | 96x64 | 5 |
+| whiteboard | 4685 | `whiteboard.png` | 64x64 | 1 |
+| Basement | 4688 | `Basement.png` | 32x32 | 16 |
+| vending machine | 5488 | `vendingmachine.png` | 48x72 | 1 |
+
+For every tile GID:
+
+```ts
+const tileset = tilesets
+  .slice()
+  .sort((a, b) => b.firstgid - a.firstgid)
+  .find((item) => gid >= item.firstgid);
+
+const localTileId = gid - tileset.firstgid;
+const sourceX = (localTileId % tileset.columns) * tileset.tilewidth;
+const sourceY = Math.floor(localTileId / tileset.columns) * tileset.tileheight;
+```
+
+Use the selected tileset’s own image, tile size, and columns. Do not use one global tile size for every tileset.
+
+## Element placement
+
+Place elements on the appropriate Tiled object/tile layer, for example:
+
+```text
+Chair
+Objects
+ObjectsOnCollide
+GenericObjects
+GenericObjectsOnCollide
+Computer
+Whiteboard
+Basement
+VendingMachine
+```
+
+The element’s source frame comes from its GID and tileset. Its destination position comes from the Tiled object’s `x` and `y` values.
+
+These are different values:
+
+```text
+sourceX/sourceY       = position inside the tileset image
+destinationX/y        = position inside the game map
 ```
 
 Example:
 
-```
-ctx.drawImage(
-  atlas,
-  sourceX,
-  sourceY,
-  32,
-  32,
-  destinationX,
-  destinationY,
-  32,
-  32,
-);
+```json
+{
+  "gid": 2561,
+  "x": 320,
+  "y": 192,
+  "width": 32,
+  "height": 64
+}
 ```
 
-If a tree is tile ID `25`:
+This means: resolve GID `2561` using the `chair` tileset and draw it at world position `(320, 192)`.
 
-```
-sourceX = (25 % 16) * 32; // 288
-sourceY = Math.floor(25 / 16) * 32; // 32
+## Rendering order
+
+Render elements in their Tiled layer order:
+
+1. Ground
+2. Walls and background objects
+3. Objects behind players
+4. Players
+5. `ObjectsOnCollide` and foreground objects
+6. HUD
+
+Do not flatten all elements into the floor layer. Layer order determines whether the player appears in front of or behind an object.
+
+## Collision
+
+Use Tiled collision properties and object collision rectangles. Do not maintain a hardcoded list of wall GIDs.
+
+For an element that blocks movement, define a collision rectangle over its physical footprint, not its entire visual image.
+
+Example:
+
+```json
+{
+  "x": 320,
+  "y": 192,
+  "width": 64,
+  "height": 96,
+  "properties": {
+    "collides": true
+  },
+  "collision": {
+    "x": 16,
+    "y": 64,
+    "width": 32,
+    "height": 24
+  }
+}
 ```
 
-If you want to place it at map position `(320, 192)`:
+The collision box should normally cover the element’s base or footprint, not its transparent upper pixels.
 
-```
-destinationX = 320;
-destinationY = 192;
-```
+## Example AI instruction
 
-So:
+```text
+Add a chair to the arena map.
 
-```
-source rectangle:      (288, 32, 32, 32)
-destination rectangle: (320, 192, 32, 32)
-```
+Use the existing chair tileset declared in map.json. Do not use FloorAndGround for this object and do not create a new PNG.
 
-To find columns and rows:
-
-```
-columns = image width / tile width
-rows = image height / tile height
+Place the chair at world position x=320, y=192 on the Chair layer.
+Preserve the chair tileset's firstgid, tilewidth, tileheight, columns, and local tile ID.
+Render the object using its resolved tileset source rectangle.
+Add a collision rectangle only over the chair's physical base.
+Export the edited map.tmx to map.json.
+Do not edit the exported tile arrays manually.
 ```
 
-For the available variants:
+## Debug mode
 
-```
-16x16 image: 256 / 16 = 16 columns
-32x32 image: 512 / 32 = 16 columns
-48x48 image: 768 / 48 = 16 columns
-```
+Add a development-only debug mode that displays:
+
+- Layer name
+- Object ID
+- GID and local tile ID
+- Tileset name
+- Object bounds
+- Collision rectangles
+
+Collision rectangles should be red. Object bounds should be yellow. This debug mode must be used to verify that visual elements and collision boundaries align.
+
+## Acceptance criteria
+
+- Elements are loaded from the Tiled map rather than hardcoded in `ArenaPage.tsx`.
+- Every GID resolves against the correct tileset.
+- Elements render at their Tiled world positions.
+- Elements preserve their correct dimensions and layer order.
+- Missing asset paths produce a clear error instead of silently rendering the wrong image.
+- Collision matches the visible physical footprint.
+- The same map data can later be converted into `Map` and `MapElements` database records.

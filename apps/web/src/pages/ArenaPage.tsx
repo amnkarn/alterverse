@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../lib/auth-client";
 import { demoSpace } from "../data/demo-data";
-import type { GameMap, CollisionRect, RemotePlayer } from "../types/map";
+import type { GameMap, CollisionRect, RemotePlayer, MapElement, TilesetDef } from "../types/map";
 import { buildCollisionRectangles, canMoveTo, scaleGameMap } from "../game/collision";
 
 // ─── Scale & Zoom Config ──────────────────────────────────────────────────────
@@ -82,6 +82,85 @@ function drawGround(
             }
         }
     }
+}
+
+const FOREGROUND_LAYERS = new Set(["objectsoncollide", "genericobjectsoncollide", "vendingmachine"]);
+
+function resolveTilesetUrl(imagePath: string): string {
+    if (imagePath.startsWith("/assets/")) return imagePath;
+    if (imagePath === "FloorAndGround.png" || imagePath.endsWith("/FloorAndGround.png")) {
+        return "/assets/map/FloorAndGround.png";
+    }
+    if (imagePath.startsWith("../items/")) {
+        return "/assets/modern_tiles/" + imagePath.slice("../items/".length);
+    }
+    if (imagePath.startsWith("../tileset/")) {
+        return "/assets/modern_tiles/" + imagePath.slice("../tileset/".length);
+    }
+    if (imagePath.includes("/")) {
+        const basename = imagePath.split("/").pop();
+        return `/assets/modern_tiles/${basename}`;
+    }
+    return `/assets/modern_tiles/${imagePath}`;
+}
+
+function resolveTile(gid: number, tilesets: TilesetDef[]) {
+    const ts = tilesets
+        .slice()
+        .sort((a, b) => b.firstgid - a.firstgid)
+        .find((item) => gid >= item.firstgid);
+    if (!ts) return null;
+
+    const localTileId = gid - ts.firstgid;
+    const sourceX = (localTileId % ts.columns) * ts.tilewidth;
+    const sourceY = Math.floor(localTileId / ts.columns) * ts.tileheight;
+    return {
+        tileset: ts,
+        localTileId,
+        sourceX,
+        sourceY,
+        tilewidth: ts.tilewidth,
+        tileheight: ts.tileheight,
+    };
+}
+
+function drawElement(
+    ctx: CanvasRenderingContext2D,
+    el: MapElement,
+    tilesets: TilesetDef[],
+    tilesetImages: Map<string, HTMLImageElement>,
+    camX: number,
+    camY: number,
+    vw: number,
+    vh: number
+) {
+    if (!el.gid) return;
+    const resolved = resolveTile(el.gid, tilesets);
+    if (!resolved) return;
+    const img = tilesetImages.get(resolved.tileset.name);
+    if (!img) return;
+
+    const destX = el.x - camX;
+    const destY = el.y - camY;
+    const destW = el.width ?? resolved.tilewidth;
+    const destH = el.height ?? resolved.tileheight;
+
+    // Viewport frustum culling
+    if (destX + destW < 0 || destX > vw || destY + destH < 0 || destY > vh) {
+        return;
+    }
+
+    ctx.drawImage(
+        img,
+        resolved.sourceX,
+        resolved.sourceY,
+        resolved.tilewidth,
+        resolved.tileheight,
+        destX,
+        destY,
+        destW,
+        destH
+    );
 }
 
 function drawPlayer(
@@ -201,6 +280,7 @@ export default function ArenaPage() {
         spriteRight?:  HTMLImageElement;
         spriteUp?:     HTMLImageElement;
         floorTileset?: HTMLImageElement;
+        tilesetImages?: Map<string, HTMLImageElement>;
         bgPattern?:    CanvasPattern | null;
     }>({});
 
@@ -384,6 +464,16 @@ export default function ArenaPage() {
             );
         }
 
+        // ── Render background / lower layer map elements ──────────────────
+        if (currentMap.tilesets && assets.tilesetImages) {
+            const bgElements = currentMap.elements.filter(
+                (el) => !FOREGROUND_LAYERS.has((el.layerName ?? el.elementId).toLowerCase())
+            );
+            for (const el of bgElements) {
+                drawElement(ctx, el, currentMap.tilesets, assets.tilesetImages, camera.x, camera.y, vw, vh);
+            }
+        }
+
         // ── Remote players ────────────────────────────────────────────────
         const sprites: Record<string, HTMLImageElement | undefined> = {
             down:  assets.spriteDown,
@@ -404,7 +494,17 @@ export default function ArenaPage() {
         const localSy = player.y - camera.y;
         drawPlayer(ctx, sprites, localSx, localSy, player.direction, player.frame, displayName, true);
 
-        // ── Debug mode: render collision rectangles in red (Requirement 10) ──
+        // ── Render foreground / collide layer map elements ────────────────
+        if (currentMap.tilesets && assets.tilesetImages) {
+            const fgElements = currentMap.elements.filter(
+                (el) => FOREGROUND_LAYERS.has((el.layerName ?? el.elementId).toLowerCase())
+            );
+            for (const el of fgElements) {
+                drawElement(ctx, el, currentMap.tilesets, assets.tilesetImages, camera.x, camera.y, vw, vh);
+            }
+        }
+
+        // ── Debug mode: render collision rectangles in red & object bounds in yellow ──
         if (debugModeRef.current) {
             ctx.save();
             ctx.lineWidth = 1.5;
@@ -417,6 +517,33 @@ export default function ArenaPage() {
                 ctx.strokeStyle = "rgba(239, 68, 68, 0.85)";
                 ctx.strokeRect(sx, sy, rect.width, rect.height);
             }
+
+            // Draw object bounds in yellow with metadata labels (specs/08-add-elements.md)
+            for (const el of currentMap.elements) {
+                const destX = el.x - camera.x;
+                const destY = el.y - camera.y;
+                const destW = el.width ?? 32;
+                const destH = el.height ?? 32;
+                if (destX + destW < 0 || destX > vw || destY + destH < 0 || destY > vh) continue;
+
+                ctx.strokeStyle = "rgba(234, 179, 8, 0.95)";
+                ctx.lineWidth = 1;
+                ctx.strokeRect(destX, destY, destW, destH);
+
+                if (currentMap.tilesets) {
+                    const res = el.gid ? resolveTile(el.gid, currentMap.tilesets) : null;
+                    const layerName = el.layerName ?? el.elementId;
+                    const tilesetName = res?.tileset.name ?? "unknown";
+                    const label = `${layerName} #${el.id}${el.gid ? ` [GID:${el.gid} (${res?.localTileId})] ${tilesetName}` : ""}`;
+                    ctx.font = "9px monospace";
+                    const textW = ctx.measureText(label).width;
+                    ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+                    ctx.fillRect(destX, destY - 12, textW + 4, 12);
+                    ctx.fillStyle = "#fef08a";
+                    ctx.fillText(label, destX + 2, destY - 3);
+                }
+            }
+
             // Draw player foot collision box in green
             const curFootX = player.x;
             const curFootY = player.y + FEET_OFFSET_Y;
@@ -472,6 +599,7 @@ export default function ArenaPage() {
                 const rects = buildCollisionRectangles(scaled);
                 collisionRectsRef.current = rects;
 
+                // Load player sprites, base floor, background pattern, and all declared tilesets
                 const [down, left, right, up, floor, bg] = await Promise.all([
                     loadImage("/assets/avtar/Down/[TD] Character 0 Down Spritesheet.png"),
                     loadImage("/assets/avtar/Left/[TD] Character 0 Left Spritesheet.png"),
@@ -480,6 +608,22 @@ export default function ArenaPage() {
                     loadImage(scaled.floor.image),
                     loadImage("/assets/background/bg.png"),
                 ]);
+
+                const tilesetImages = new Map<string, HTMLImageElement>();
+                if (scaled.tilesets) {
+                    await Promise.all(
+                        scaled.tilesets.map(async (ts) => {
+                            const url = resolveTilesetUrl(ts.image);
+                            try {
+                                const img = await loadImage(url);
+                                tilesetImages.set(ts.name, img);
+                            } catch (err) {
+                                console.error(`Failed to load tileset image for ${ts.name} from ${url}:`, err);
+                                throw new Error(`Missing tileset asset: ${url} for tileset ${ts.name}`, { cause: err });
+                            }
+                        })
+                    );
+                }
 
                 if (cancelled) return;
 
@@ -493,6 +637,7 @@ export default function ArenaPage() {
                     spriteRight:  right,
                     spriteUp:     up,
                     floorTileset: floor,
+                    tilesetImages,
                     bgPattern:    pat,
                 };
 
@@ -632,10 +777,10 @@ export default function ArenaPage() {
                     gap: 10,
                 }}
             >
-                {/* Collision debug toggle button */}
+                {/* Collision & element debug toggle button */}
                 <button
                     onClick={() => setDebugMode((prev) => !prev)}
-                    title="Toggle collision rectangles overlay (Hotkey: C)"
+                    title="Toggle collision & element bounds debug overlay (Hotkey: C)"
                     style={{
                         padding: "7px 14px",
                         borderRadius: 10,
@@ -663,7 +808,7 @@ export default function ArenaPage() {
                             boxShadow: debugMode ? "0 0 8px #ef4444" : "none",
                         }}
                     />
-                    <span>[C] Collisions: {debugMode ? "ON" : "OFF"}</span>
+                    <span>[C] Debug: {debugMode ? "ON" : "OFF"}</span>
                 </button>
 
                 <div

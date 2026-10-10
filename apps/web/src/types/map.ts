@@ -1,16 +1,35 @@
 export type MapElement = {
     id: string;
     elementId: string;
+    gid?: number;
+    layerName?: string;
     x: number;
     y: number;
+    width?: number;
+    height?: number;
     rotation?: number;
     layer?: number;
+    properties?: { name: string; type?: string; value: unknown }[];
     collision?: {
         x: number;
         y: number;
         width: number;
         height: number;
     };
+};
+
+export type TilesetDef = {
+    firstgid: number;
+    name: string;
+    image: string;
+    tilewidth: number;
+    tileheight: number;
+    columns: number;
+    tilecount: number;
+    tiles?: {
+        id: number;
+        properties?: { name: string; type?: string; value: unknown }[];
+    }[];
 };
 
 export type GameMap = {
@@ -40,19 +59,7 @@ export type GameMap = {
         y: number;
     }[];
 
-    tilesets?: {
-        firstgid?: number;
-        name?: string;
-        image?: string;
-        tilewidth?: number;
-        tileheight?: number;
-        columns?: number;
-        tilecount?: number;
-        tiles?: {
-            id: number;
-            properties?: { name: string; type?: string; value: unknown }[];
-        }[];
-    }[];
+    tilesets?: TilesetDef[];
 
     layers?: {
         id?: number;
