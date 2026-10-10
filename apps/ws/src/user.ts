@@ -137,6 +137,24 @@ export class User {
                     console.log("movement rejected becase of invaid move");
                     break;
 
+                case "player-state":
+                    if (this.spaceId) {
+                        const targetUserId = this.userId || parsedData.playerId || this.id;
+                        if (typeof parsedData.x === "number") this.x = parsedData.x;
+                        if (typeof parsedData.y === "number") this.y = parsedData.y;
+                        RoomManager.getInstance().broadcast({
+                            type: "player-state",
+                            payload: {
+                                userId: targetUserId,
+                                playerId: targetUserId,
+                                state: parsedData.state,
+                                x: parsedData.x,
+                                y: parsedData.y,
+                                direction: parsedData.direction,
+                            }
+                        }, this, this.spaceId);
+                    }
+                    break;
             }
 
         })

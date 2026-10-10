@@ -11261,7 +11261,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 336,
+                "y": 616,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-335",
@@ -11278,7 +11283,12 @@
                     "type": "string",
                     "value": "left"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 526,
+                "y": 680,
+                "direction": "left"
+            }
         },
         {
             "id": "chair-340",
@@ -11295,7 +11305,12 @@
                     "type": "string",
                     "value": "right"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 274,
+                "y": 680,
+                "direction": "right"
+            }
         },
         {
             "id": "chair-342",
@@ -11312,7 +11327,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 400,
+                "y": 616,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-346",
@@ -11329,7 +11349,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 560,
+                "y": 392,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-347",
@@ -11346,7 +11371,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 304,
+                "y": 392,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-348",
@@ -11363,7 +11393,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 272,
+                "y": 392,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-349",
@@ -11380,7 +11415,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 592,
+                "y": 392,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-350",
@@ -11397,7 +11437,12 @@
                     "type": "string",
                     "value": "left"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 974,
+                "y": 168,
+                "direction": "left"
+            }
         },
         {
             "id": "chair-361",
@@ -11414,7 +11459,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 240,
+                "y": 392,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-363",
@@ -11431,7 +11481,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 528,
+                "y": 392,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-364",
@@ -11448,7 +11503,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 496,
+                "y": 392,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-365",
@@ -11465,7 +11525,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 464,
+                "y": 616,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-438",
@@ -11482,7 +11547,12 @@
                     "type": "string",
                     "value": "up"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 336,
+                "y": 696,
+                "direction": "up"
+            }
         },
         {
             "id": "chair-439",
@@ -11499,7 +11569,12 @@
                     "type": "string",
                     "value": "up"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 400,
+                "y": 696,
+                "direction": "up"
+            }
         },
         {
             "id": "chair-440",
@@ -11516,7 +11591,12 @@
                     "type": "string",
                     "value": "up"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 464,
+                "y": 696,
+                "direction": "up"
+            }
         },
         {
             "id": "chair-618",
@@ -11533,7 +11613,12 @@
                     "type": "string",
                     "value": "up"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 1200,
+                "y": 536,
+                "direction": "up"
+            }
         },
         {
             "id": "chair-619",
@@ -11550,7 +11635,12 @@
                     "type": "string",
                     "value": "up"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 1104,
+                "y": 536,
+                "direction": "up"
+            }
         },
         {
             "id": "chair-620",
@@ -11567,7 +11657,12 @@
                     "type": "string",
                     "value": "up"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 1008,
+                "y": 536,
+                "direction": "up"
+            }
         },
         {
             "id": "chair-621",
@@ -11584,7 +11679,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 1200,
+                "y": 456,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-622",
@@ -11601,7 +11701,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 1104,
+                "y": 456,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-677",
@@ -11618,7 +11723,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 1200,
+                "y": 712,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-678",
@@ -11635,7 +11745,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 1104,
+                "y": 712,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-679",
@@ -11652,7 +11767,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 1008,
+                "y": 712,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-680",
@@ -11669,7 +11789,12 @@
                     "type": "string",
                     "value": "up"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 1200,
+                "y": 792,
+                "direction": "up"
+            }
         },
         {
             "id": "chair-681",
@@ -11686,7 +11811,12 @@
                     "type": "string",
                     "value": "up"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 1008,
+                "y": 792,
+                "direction": "up"
+            }
         },
         {
             "id": "chair-1079",
@@ -11703,7 +11833,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 656,
+                "y": 104,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-1080",
@@ -11720,7 +11855,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 688,
+                "y": 104,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-1081",
@@ -11737,7 +11877,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 720,
+                "y": 104,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-1251",
@@ -11754,7 +11899,12 @@
                     "type": "string",
                     "value": "right"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 466,
+                "y": 258,
+                "direction": "right"
+            }
         },
         {
             "id": "chair-1252",
@@ -11771,7 +11921,12 @@
                     "type": "string",
                     "value": "right"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 466,
+                "y": 304,
+                "direction": "right"
+            }
         },
         {
             "id": "chair-1253",
@@ -11788,7 +11943,12 @@
                     "type": "string",
                     "value": "left"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 558,
+                "y": 258,
+                "direction": "left"
+            }
         },
         {
             "id": "chair-1254",
@@ -11805,7 +11965,12 @@
                     "type": "string",
                     "value": "left"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 558,
+                "y": 304,
+                "direction": "left"
+            }
         },
         {
             "id": "objects-372",
@@ -16130,7 +16295,12 @@
                     "type": "string",
                     "value": "down"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 1008,
+                "y": 456,
+                "direction": "down"
+            }
         },
         {
             "id": "chair-1270",
@@ -16147,7 +16317,12 @@
                     "type": "string",
                     "value": "up"
                 }
-            ]
+            ],
+            "sitPoint": {
+                "x": 1104,
+                "y": 792,
+                "direction": "up"
+            }
         }
     ]
 }

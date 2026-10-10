@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../lib/auth-client";
 import { demoSpace } from "../data/demo-data";
-import type { GameMap, CollisionRect, RemotePlayer, MapElement, TilesetDef } from "../types/map";
+import type { GameMap, CollisionRect, RemotePlayer, MapElement, TilesetDef, PlayerState } from "../types/map";
 import { buildCollisionRectangles, canMoveTo, scaleGameMap } from "../game/collision";
 
 // ─── Scale & Zoom Config ──────────────────────────────────────────────────────
@@ -134,6 +134,55 @@ function findNearestSittable(
     return closest;
 }
 
+function getElementSitPoint(
+    el: MapElement,
+    _currentFootX?: number,
+    currentFootY?: number
+): { x: number; y: number; direction: "down" | "left" | "right" | "up" } {
+    if (el.sitPoint) {
+        return {
+            x: el.sitPoint.x,
+            y: el.sitPoint.y,
+            direction: el.sitPoint.direction ?? "down",
+        };
+    }
+
+    const w = el.width ?? 32;
+    const h = el.height ?? 32;
+    const dirProp = el.properties?.find((p) => p.name === "direction")?.value as
+        | "down"
+        | "left"
+        | "right"
+        | "up"
+        | undefined;
+
+    let dir: "down" | "left" | "right" | "up" = dirProp ?? "down";
+    let sitX = el.x + w / 2;
+    let sitY: number;
+
+    if (dir === "down") {
+        sitY = el.y + h * 0.625;
+    } else if (dir === "up") {
+        sitY = el.y + h * 0.38;
+    } else if (dir === "left") {
+        sitX = el.x + w * 0.45;
+        sitY = el.y + h * 0.5;
+    } else if (dir === "right") {
+        sitX = el.x + w * 0.55;
+        sitY = el.y + h * 0.5;
+    } else {
+        if (currentFootY !== undefined && currentFootY > el.y + h / 2) {
+            dir = "up";
+            sitY = el.y + h * 0.38;
+        } else {
+            dir = "down";
+            sitY = el.y + h * 0.625;
+        }
+    }
+
+    return { x: Math.round(sitX), y: Math.round(sitY), direction: dir };
+}
+
 function resolveTilesetUrl(imagePath: string): string {
     if (imagePath.startsWith("/assets/")) return imagePath;
     if (imagePath === "FloorAndGround.png" || imagePath.endsWith("/FloorAndGround.png")) {
@@ -219,7 +268,8 @@ function drawPlayer(
     dir: "down" | "left" | "right" | "up",
     frame: number,
     name: string,
-    isLocal: boolean
+    isLocal: boolean,
+    isSitting: boolean = false
 ) {
     const sheet = sprites[dir];
     const dw = PLAYER_RENDER_W;
@@ -228,12 +278,23 @@ function drawPlayer(
     const dy = sy - dh / 2;
 
     if (sheet) {
-        ctx.drawImage(
-            sheet,
-            frame * SPRITE_FRAME_W, 0,
-            SPRITE_FRAME_W, SPRITE_FRAME_H,
-            dx, dy, dw, dh
-        );
+        if (isSitting) {
+            // Spec 10: crop upper body only (sourceH = 42, destH = 126), hiding legs cleanly
+            ctx.drawImage(
+                sheet,
+                frame * SPRITE_FRAME_W, 0,
+                SPRITE_FRAME_W, 42,
+                dx, dy,
+                dw, 126
+            );
+        } else {
+            ctx.drawImage(
+                sheet,
+                frame * SPRITE_FRAME_W, 0,
+                SPRITE_FRAME_W, SPRITE_FRAME_H,
+                dx, dy, dw, dh
+            );
+        }
     } else {
         ctx.fillStyle = isLocal ? "#8b5cf6" : "#38bdf8";
         ctx.beginPath();
@@ -332,6 +393,30 @@ export default function ArenaPage() {
         bgPattern?:    CanvasPattern | null;
     }>({});
 
+    // ── Sitting state & WebSocket sync ────────────────────────────────────
+    const [playerState, setPlayerState] = useState<PlayerState>("idle");
+    const playerStateRef = useRef<PlayerState>("idle");
+    const seatedElementRef = useRef<MapElement | null>(null);
+    const wsRef = useRef<WebSocket | null>(null);
+
+    const broadcastPlayerState = useCallback(
+        (state: PlayerState, x: number, y: number, direction: "down" | "left" | "right" | "up") => {
+            const playerId = session?.user?.id || "user-" + (navState?.displayName || displayName || "player");
+            const payload = {
+                type: "player-state",
+                playerId,
+                state,
+                x,
+                y,
+                direction,
+            };
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                wsRef.current.send(JSON.stringify(payload));
+            }
+        },
+        [session?.user?.id, navState?.displayName, displayName]
+    );
+
     // ── Backend sync stubs ────────────────────────────────────────────────
     const onLocalPlayerMove = useCallback(
         (x: number, y: number, dir: string, frame: number) => {
@@ -370,9 +455,28 @@ export default function ArenaPage() {
         if (keys.has("arrowup")    || keys.has("keyw") || keys.has("w")) vy -= 1;
         if (keys.has("arrowdown")  || keys.has("keys") || keys.has("s")) vy += 1;
 
+        if (playerStateRef.current === "sitting") {
+            if (vx !== 0 || vy !== 0) {
+                // User pressed movement keys while seated: stand up and resume walking
+                playerStateRef.current = "walking";
+                setPlayerState("walking");
+                seatedElementRef.current = null;
+                broadcastPlayerState("walking", player.x, player.y, player.direction);
+            } else {
+                // Movement disabled while sitting: lock frame to stable idle frame 1
+                player.frame = 1;
+                vx = 0;
+                vy = 0;
+            }
+        }
+
         let moved = false;
 
         if (vx !== 0 || vy !== 0) {
+            if (playerStateRef.current !== "walking") {
+                playerStateRef.current = "walking";
+                setPlayerState("walking");
+            }
             if (vy > 0) player.direction = "down";
             else if (vy < 0) player.direction = "up";
             else if (vx < 0) player.direction = "left";
@@ -465,6 +569,10 @@ export default function ArenaPage() {
                 onLocalPlayerMove(player.x, player.y, player.direction, 1);
             }
             animAccRef.current = 0;
+            if (playerStateRef.current === "walking") {
+                playerStateRef.current = "idle";
+                setPlayerState("idle");
+            }
         }
 
         // ── Camera: center map if viewport is larger, follow player if smaller
@@ -544,6 +652,7 @@ export default function ArenaPage() {
                           frame: number;
                           displayName: string;
                           isLocal: boolean;
+                          isSitting: boolean;
                       };
                   };
 
@@ -571,17 +680,19 @@ export default function ArenaPage() {
                 const sx = rp.x - camera.x;
                 const sy = rp.y - camera.y;
                 if (sx < -96 || sx > vw + 96 || sy < -96 || sy > vh + 96) return;
+                const isSitting = rp.state === "sitting";
                 entities.push({
                     kind: "player",
-                    depthY: rp.y + FEET_OFFSET_Y,
+                    depthY: isSitting ? rp.y : rp.y + FEET_OFFSET_Y,
                     priority: 45,
                     player: {
                         sx,
                         sy,
                         direction: rp.direction,
-                        frame: rp.frame,
+                        frame: isSitting ? 1 : rp.frame,
                         displayName: rp.displayName,
                         isLocal: false,
+                        isSitting,
                     },
                 });
             });
@@ -589,17 +700,35 @@ export default function ArenaPage() {
             // 3. Local player
             const localSx = player.x - camera.x;
             const localSy = player.y - camera.y;
+            const isLocalSitting = playerStateRef.current === "sitting";
+            const seatedChair = seatedElementRef.current;
+            let localDepthY = curFootY;
+            if (isLocalSitting && seatedChair) {
+                const chairH = seatedChair.height ?? 32;
+                const chairDir = seatedChair.properties?.find((p) => p.name === "direction")?.value;
+                if (chairDir === "up") {
+                    // Facing up: avatar renders behind the chair's backrest
+                    localDepthY = seatedChair.y + chairH - 1;
+                } else {
+                    // Facing down / left / right: avatar renders in front of the chair backrest
+                    localDepthY = seatedChair.y + chairH + 1;
+                }
+            } else if (isLocalSitting) {
+                localDepthY = player.y;
+            }
+
             entities.push({
                 kind: "player",
-                depthY: curFootY,
+                depthY: localDepthY,
                 priority: 45,
                 player: {
                     sx: localSx,
                     sy: localSy,
                     direction: player.direction,
-                    frame: player.frame,
+                    frame: isLocalSitting ? 1 : player.frame,
                     displayName,
                     isLocal: true,
+                    isSitting: isLocalSitting,
                 },
             });
 
@@ -617,12 +746,12 @@ export default function ArenaPage() {
                     drawElement(ctx, entity.element, currentMap.tilesets, assets.tilesetImages, camera.x, camera.y, vw, vh);
                 } else {
                     const p = entity.player;
-                    drawPlayer(ctx, sprites, p.sx, p.sy, p.direction, p.frame, p.displayName, p.isLocal);
+                    drawPlayer(ctx, sprites, p.sx, p.sy, p.direction, p.frame, p.displayName, p.isLocal, p.isSitting);
                 }
             }
 
             // Floating sit prompt popup on canvas directly at the nearest table or chair
-            if (nearestSittable) {
+            if (nearestSittable && playerStateRef.current !== "sitting") {
                 ctx.save();
                 const promptText = "Press E to sit";
                 ctx.font = "bold 13px 'Inter', system-ui, sans-serif";
@@ -751,7 +880,7 @@ export default function ArenaPage() {
         }
 
         rafRef.current = requestAnimationFrame((ts) => gameLoopRef.current?.(ts));
-    }, [displayName, onLocalPlayerMove]);
+    }, [displayName, onLocalPlayerMove, broadcastPlayerState]);
 
     useEffect(() => {
         gameLoopRef.current = gameLoop;
@@ -887,6 +1016,31 @@ export default function ArenaPage() {
                 setDebugMode((prev) => !prev);
             }
 
+            // Sit on / stand up from nearest sittable element with 'E' key
+            if ((keyLower === "e" || codeLower === "keye") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                if (playerStateRef.current === "sitting") {
+                    playerStateRef.current = "walking";
+                    setPlayerState("walking");
+                    seatedElementRef.current = null;
+                    broadcastPlayerState("walking", playerRef.current.x, playerRef.current.y, playerRef.current.direction);
+                } else {
+                    const footX = playerRef.current.x;
+                    const footY = playerRef.current.y + FEET_OFFSET_Y;
+                    const nearest = findNearestSittable(footX, footY, mapRef.current.elements);
+                    if (nearest) {
+                        const sit = getElementSitPoint(nearest, footX, footY);
+                        playerRef.current.x = sit.x;
+                        playerRef.current.y = sit.y;
+                        playerRef.current.direction = sit.direction;
+                        playerRef.current.frame = 1;
+                        seatedElementRef.current = nearest;
+                        playerStateRef.current = "sitting";
+                        setPlayerState("sitting");
+                        broadcastPlayerState("sitting", sit.x, sit.y, sit.direction);
+                    }
+                }
+            }
+
             keysRef.current.add(keyLower);
             keysRef.current.add(codeLower);
         };
@@ -911,7 +1065,7 @@ export default function ArenaPage() {
             window.removeEventListener("keyup",   onUp);
             window.removeEventListener("blur",    onBlur);
         };
-    }, []);
+    }, [broadcastPlayerState]);
 
     // ── Render ────────────────────────────────────────────────────────────
     return (
@@ -1070,7 +1224,7 @@ export default function ArenaPage() {
                     letterSpacing: "0.05em",
                 }}
             >
-                WASD / Arrow keys to move
+                {playerState === "sitting" ? "[WASD / E] Stand up" : "WASD to move • [E] Sit"}
             </div>
         </div>
     );

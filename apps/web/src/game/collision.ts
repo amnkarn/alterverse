@@ -147,6 +147,13 @@ export function scaleGameMap(rawMap: GameMap, scale: number): GameMap {
                       height: Math.round(el.collision.height * tileScale),
                   }
                 : undefined,
+            sitPoint: el.sitPoint
+                ? {
+                      x: Math.round(el.sitPoint.x * tileScale),
+                      y: Math.round(el.sitPoint.y * tileScale),
+                      direction: el.sitPoint.direction,
+                  }
+                : undefined,
         })),
         spawnPoints: rawMap.spawnPoints.map((sp) => ({
             x: Math.round(sp.x * tileScale),

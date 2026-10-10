@@ -16,6 +16,11 @@ export type MapElement = {
         width: number;
         height: number;
     };
+    sitPoint?: {
+        x: number;
+        y: number;
+        direction?: "down" | "left" | "right" | "up";
+    };
 };
 
 export type TilesetDef = {
@@ -83,6 +88,8 @@ export type CollisionRect = {
     height: number;
 };
 
+export type PlayerState = "idle" | "walking" | "sitting";
+
 export interface RemotePlayer {
     id: string;
     x: number;
@@ -90,4 +97,5 @@ export interface RemotePlayer {
     direction: "down" | "left" | "right" | "up";
     frame: number;
     displayName: string;
+    state?: PlayerState;
 }
