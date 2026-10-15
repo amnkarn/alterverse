@@ -213,16 +213,24 @@ function findNearestSittable(
     let minDist = Infinity;
 
     for (const el of elements) {
-        const layer = (el.layerName ?? el.elementId).toLowerCase();
-        const isChair = layer === "chair";
-        const isSittable =
-            isChair ||
-            layer === "computer" ||
-            layer === "objectsoncollide" ||
-            layer === "genericobjectsoncollide" ||
-            (layer === "basement" && el.id.startsWith("basement-119")) ||
-            layer === "genericobjects";
-        if (!isSittable) continue;
+        const layer = (el.layerName ?? "").toLowerCase();
+        const elementId = (el.elementId ?? "").toLowerCase();
+        const id = (el.id ?? "").toLowerCase();
+
+        // Only allow actual chairs and sofas (strictly excluding tables, desks, computers, etc.)
+        const isChairOrSofa =
+            layer === "chair" ||
+            layer === "sofa" ||
+            layer === "couch" ||
+            elementId === "chair" ||
+            elementId === "sofa" ||
+            elementId === "couch" ||
+            id.startsWith("chair") ||
+            id.startsWith("sofa") ||
+            id.startsWith("couch") ||
+            Boolean(el.properties?.some((p) => p.name === "isSittable" && p.value === true));
+
+        if (!isChairOrSofa) continue;
 
         const w = el.width ?? 32;
         const h = el.height ?? 32;
@@ -230,10 +238,8 @@ function findNearestSittable(
         const dy = Math.max(el.y - footY, 0, footY - (el.y + h));
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        // Prefer chairs when both chair and table are within proximity
-        const score = isChair ? dist * 0.75 : dist;
-        if (dist <= PROXIMITY_THRESHOLD && score < minDist) {
-            minDist = score;
+        if (dist <= PROXIMITY_THRESHOLD && dist < minDist) {
+            minDist = dist;
             closest = el;
         }
     }
@@ -458,7 +464,7 @@ function drawPlayer(
     ctx.font = "bold 13px 'Inter', system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
-    const nameLabel = `${username || "Player"} • ${charId === "Hermoine" ? "Hermione" : charId}`;
+    const nameLabel = username || "Player";
     const tw = ctx.measureText(nameLabel).width;
     const tagY = Math.min(dy - 4, bubbleTopY);
     const px = 8;
@@ -640,19 +646,9 @@ export default function ArenaPage() {
         if (keys.has("arrowdown")  || keys.has("keys") || keys.has("s")) vy += 1;
 
         if (player.state === "sitting") {
-            if (vx !== 0 || vy !== 0) {
-                // Movement key pressed while sitting: revert to idle/walking, unlock controls, offset slightly
-                player.state = "walking";
-                setPlayerState("walking");
-                seatedElementRef.current = null;
-                player.globalX += vx * 12;
-                player.globalY += vy * 12;
-                onPlayerStateChange(player);
-            } else {
-                // Movement locked while sitting
-                vx = 0;
-                vy = 0;
-            }
+            // Movement strictly disabled while sitting - only key 'E' allows standing up
+            vx = 0;
+            vy = 0;
         }
 
         let moved = false;
@@ -961,23 +957,25 @@ export default function ArenaPage() {
                 }
             }
 
-            // Floating sit prompt popup on canvas directly at the nearest table or chair
-            if (nearestSittable && player.state !== "sitting") {
+            // Floating sit / stand prompt popup on canvas directly at the chair/sofa
+            const targetPromptElement = isLocalSitting ? seatedElementRef.current : nearestSittable;
+
+            if (targetPromptElement) {
                 ctx.save();
-                const promptText = "Press E to sit";
+                const promptText = isLocalSitting ? "Press E to stand" : "Press E to sit";
                 ctx.font = "bold 13px 'Inter', system-ui, sans-serif";
                 const ptw = ctx.measureText(promptText).width;
                 const promptW = ptw + 34;
                 const promptH = 26;
 
-                const elemW = nearestSittable.width ?? 32;
-                const elemH = nearestSittable.height ?? 32;
-                const elemSx = nearestSittable.x - camera.x;
-                const elemSy = nearestSittable.y - camera.y;
+                const elemW = targetPromptElement.width ?? 32;
+                const elemH = targetPromptElement.height ?? 32;
+                const elemSx = targetPromptElement.x - camera.x;
+                const elemSy = targetPromptElement.y - camera.y;
                 const elemCenterX = elemSx + elemW / 2;
 
-                // Position label just after the element on the side the player is standing
-                const isPlayerBelow = curFootY > nearestSittable.y + elemH / 2;
+                // Position label just after the element on the side the player is standing or sitting
+                const isPlayerBelow = curFootY > targetPromptElement.y + elemH / 2;
                 const promptY = isPlayerBelow ? elemSy + elemH + 6 : elemSy - promptH - 6;
                 const promptX = Math.max(8, Math.min(vw - promptW - 8, elemCenterX - promptW / 2));
                 const arrowX = Math.max(promptX + 12, Math.min(promptX + promptW - 12, elemCenterX));
@@ -1232,12 +1230,23 @@ export default function ArenaPage() {
                 if (playerRef.current.state === "sitting") {
                     playerRef.current.state = "idle";
                     setPlayerState("idle");
-                    // Offset slightly out of chair in direction they were facing
+                    // Safely dismount chair/sofa in the direction player was facing
                     const dir = playerRef.current.direction;
-                    if (dir === "down") playerRef.current.globalY += 24;
-                    else if (dir === "up") playerRef.current.globalY -= 24;
-                    else if (dir === "left") playerRef.current.globalX -= 24;
-                    else if (dir === "right") playerRef.current.globalX += 24;
+                    let targetX = playerRef.current.globalX;
+                    let targetY = playerRef.current.globalY;
+                    if (dir === "down") targetY += 24;
+                    else if (dir === "up") targetY -= 24;
+                    else if (dir === "left") targetX -= 24;
+                    else if (dir === "right") targetX += 24;
+
+                    const curMap = mapRef.current;
+                    const cRects = collisionRectsRef.current;
+                    if (canMoveTo(targetX, targetY + FEET_OFFSET_Y, curMap, cRects)) {
+                        playerRef.current.globalX = targetX;
+                        playerRef.current.globalY = targetY;
+                    } else if (canMoveTo(playerRef.current.globalX, playerRef.current.globalY + FEET_OFFSET_Y + 16, curMap, cRects)) {
+                        playerRef.current.globalY += 16;
+                    }
                     seatedElementRef.current = null;
                     onPlayerStateChange(playerRef.current);
                 } else {
