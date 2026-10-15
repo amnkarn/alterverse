@@ -18,13 +18,11 @@ export default function SpacePage() {
 
     const [avatars, setAvatars] = useState<AvtarItem[]>([]);
     const [selectedAvatarId, setSelectedAvatarId] = useState<string | null>(null);
-    const [userEnteredName, setUserEnteredName] = useState<string | null>(null);
+    const [displayName, setDisplayName] = useState<string>(() => {
+        return localStorage.getItem("alterverse_display_name") || "";
+    });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-
-    // Default to stored name or session user name
-    const defaultName = localStorage.getItem("alterverse_display_name") || session?.user?.name || "";
-    const displayName = userEnteredName !== null ? userEnteredName : defaultName;
 
     const handleLogout = async () => {
         await signOut();
@@ -98,6 +96,9 @@ export default function SpacePage() {
 
         localStorage.setItem("alterverse_display_name", trimmedName);
         localStorage.setItem("alterverse_avatar_id", selectedAvatarId);
+        if (selectedAvatar?.name) {
+            localStorage.setItem("alterverse_avatar_name", selectedAvatar.name);
+        }
 
         navigate(`/app/spaces/${spaceId}/arena`, {
             state: {
@@ -253,7 +254,8 @@ export default function SpacePage() {
                                                         <img
                                                             src={avatar.imageUrl}
                                                             alt={avatar.name}
-                                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                                            className="w-full h-full object-contain p-1.5 group-hover:scale-105 transition-transform duration-200"
+                                                            style={{ imageRendering: "pixelated" }}
                                                             onError={(e) => {
                                                                 (e.target as HTMLImageElement).src = 
                                                                     "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 24 24' fill='none' stroke='%23a855f7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E";
@@ -292,7 +294,7 @@ export default function SpacePage() {
                                         value={displayName}
                                         maxLength={32}
                                         onChange={(e) => {
-                                            setUserEnteredName(e.target.value);
+                                            setDisplayName(e.target.value);
                                             if (error) setError(null);
                                         }}
                                         className="bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none w-full font-medium"
@@ -300,7 +302,7 @@ export default function SpacePage() {
                                     {displayName && (
                                         <button
                                             type="button"
-                                            onClick={() => setUserEnteredName("")}
+                                            onClick={() => setDisplayName("")}
                                             className="text-[11px] text-slate-400 hover:text-slate-200 ml-2 cursor-pointer"
                                         >
                                             Clear

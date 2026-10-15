@@ -4,7 +4,6 @@ import { useSession } from "../lib/auth-client";
 import { demoSpace } from "../data/demo-data";
 import type { GameMap, CollisionRect, RemotePlayer, MapElement, TilesetDef, PlayerState, CharacterId } from "../types/map";
 import { buildCollisionRectangles, canMoveTo, scaleGameMap } from "../game/collision";
-import { Sparkles, X, MessageSquare, Send, Check } from "lucide-react";
 
 // ─── Scale & Zoom Config ──────────────────────────────────────────────────────
 // Zooms map tiles, walls, and background without changing avatar size
@@ -18,6 +17,15 @@ interface CharacterOption {
     house: string;
     description: string;
     preview: string;
+}
+
+function resolveCharacterId(avatarName?: string | null): CharacterId {
+    if (!avatarName) return "Harry";
+    const lower = avatarName.toLowerCase();
+    if (lower.includes("herm")) return "Hermoine";
+    if (lower.includes("ron")) return "Ron";
+    if (lower.includes("ginny")) return "Ginny";
+    return "Harry";
 }
 
 const CHARACTER_OPTIONS: CharacterOption[] = [
@@ -66,10 +74,17 @@ const CHAR_RENDER_H = Math.round(CHAR_FRAME_H * CHAR_SCALE); // ~106 px
 const FEET_OFFSET_Y = Math.round(CHAR_RENDER_H / 2 - 8); // ~45 px
 const PLAYER_SPEED  = 7;
 
-// Animation timing
+// Animation timing and directional spritesheet layout (4 directions x 6 frames each)
 const TOTAL_ANIM_FRAMES = 24;
-const RUN_FPS  = 18; // Fast timestamp delta tick for walking
-const IDLE_FPS = 9;  // Slower looping for breathing idle
+const FRAMES_PER_DIR = 6;
+const DIRECTION_FRAME_OFFSET: Record<"right" | "up" | "left" | "down", number> = {
+    right: 0,   // frames 1..6
+    up: 6,      // frames 7..12
+    left: 12,   // frames 13..18
+    down: 18,   // frames 19..24
+};
+const RUN_FPS  = 12; // 12 FPS: smooth walking stride (6 frames per cycle = 0.5s)
+const IDLE_FPS = 4;  // 4 FPS: gentle idle breathing cycle within current facing direction
 
 interface CharacterFrameSet {
     idle: HTMLImageElement[];
@@ -372,34 +387,25 @@ function drawPlayer(
 
     if (charSet) {
         let frameImg: HTMLImageElement | undefined;
-        let needsMirror = false;
 
         if (state === "sitting") {
-            // Sitting: stop frame increments, resolve exact static sitting sprite for direction
+            // Sitting: exact static sitting sprite for direction
             frameImg = charSet.sit[dir] || charSet.sit.down;
-        } else if (state === "walking") {
-            // Walking: 1 to 24 run frames
-            const frameIdx = Math.max(0, Math.min(TOTAL_ANIM_FRAMES - 1, currentFrame - 1));
-            frameImg = charSet.run[frameIdx] || charSet.run[0];
-            // Run animation natively faces right; mirror horizontally when moving left
-            needsMirror = dir === "left";
         } else {
-            // Idle: 1 to 24 idle anim frames
-            const frameIdx = Math.max(0, Math.min(TOTAL_ANIM_FRAMES - 1, currentFrame - 1));
-            frameImg = charSet.idle[frameIdx] || charSet.idle[0];
-            needsMirror = dir === "left";
+            // Map direction + anim frame (1..6) to correct spritesheet slice
+            const dirOffset = DIRECTION_FRAME_OFFSET[dir] ?? 18;
+            const animIndex = ((Math.max(1, currentFrame) - 1) % FRAMES_PER_DIR);
+            const frameIdx = dirOffset + animIndex;
+
+            if (state === "walking") {
+                frameImg = charSet.run[frameIdx] || charSet.run[dirOffset];
+            } else {
+                frameImg = charSet.idle[frameIdx] || charSet.idle[dirOffset];
+            }
         }
 
         if (frameImg) {
-            if (needsMirror) {
-                ctx.save();
-                ctx.translate(sx, sy);
-                ctx.scale(-1, 1);
-                ctx.drawImage(frameImg, -dw / 2, -dh / 2, dw, dh);
-                ctx.restore();
-            } else {
-                ctx.drawImage(frameImg, dx, dy, dw, dh);
-            }
+            ctx.drawImage(frameImg, dx, dy, dw, dh);
         }
     } else {
         ctx.fillStyle = isLocal ? "#8b5cf6" : "#38bdf8";
@@ -512,12 +518,11 @@ export default function ArenaPage() {
     const initialDprRef     = useRef<number>(window.devicePixelRatio || 1);
     const keysRef           = useRef<Set<string>>(new Set());
 
-    const [selectedCharacter, setSelectedCharacter] = useState<CharacterId>("Harry");
-    const [showCharacterPicker, setShowCharacterPicker] = useState<boolean>(true);
-    const [currentUsername, setCurrentUsername] = useState<string>(displayName);
-    const [chatInput, setChatInput] = useState<string>("");
-    const [activeChatMessage, setActiveChatMessage] = useState<string>("");
-    const chatTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const initialCharacter = resolveCharacterId(
+        navState?.avatar?.name ||
+            (typeof window !== "undefined" ? localStorage.getItem("alterverse_avatar_name") : null)
+    );
+    const currentUsername = displayName;
 
     const playerRef = useRef<{
         name: CharacterId;
@@ -534,7 +539,7 @@ export default function ArenaPage() {
         get frame(): number;
         set frame(val: number);
     }>({
-        name: "Harry",
+        name: initialCharacter,
         username: displayName,
         state: "idle",
         direction: "down",
@@ -564,7 +569,7 @@ export default function ArenaPage() {
     }>({});
 
     // ── Sitting state & WebSocket sync ────────────────────────────────────
-    const [playerState, setPlayerState] = useState<PlayerState>("idle");
+    const [, setPlayerState] = useState<PlayerState>("idle");
     const seatedElementRef = useRef<MapElement | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
 
@@ -604,52 +609,6 @@ export default function ArenaPage() {
     useEffect(() => {
         playerRef.current.username = currentUsername;
     }, [currentUsername]);
-
-    // Handle character switch from CharacterPicker UI
-    const handleSelectCharacter = useCallback(
-        (charId: CharacterId) => {
-            setSelectedCharacter(charId);
-            playerRef.current.name = charId;
-            setShowCharacterPicker(false);
-            onPlayerStateChange(playerRef.current);
-        },
-        [onPlayerStateChange]
-    );
-
-    // Handle chat submission
-    const handleSendMessage = useCallback(() => {
-        const trimmed = chatInput.trim();
-        if (!trimmed) return;
-
-        if (trimmed.startsWith("/name ")) {
-            const newName = trimmed.slice(6).trim();
-            if (newName) {
-                setCurrentUsername(newName);
-                playerRef.current.username = newName;
-                onPlayerStateChange(playerRef.current);
-            }
-        } else {
-            setActiveChatMessage(trimmed);
-            if (chatTimeoutRef.current) {
-                clearTimeout(chatTimeoutRef.current);
-            }
-            chatTimeoutRef.current = setTimeout(() => {
-                setActiveChatMessage("");
-            }, 5000);
-
-            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                wsRef.current.send(
-                    JSON.stringify({
-                        type: "chat-message",
-                        playerId: session?.user?.id || "user-" + (currentUsername || "player"),
-                        message: trimmed,
-                    })
-                );
-            }
-        }
-
-        setChatInput("");
-    }, [chatInput, currentUsername, onPlayerStateChange, session?.user?.id]);
 
     // ── Main game loop ────────────────────────────────────────────────────
     const gameLoopRef = useRef<((ts: number) => void) | null>(null);
@@ -703,10 +662,15 @@ export default function ArenaPage() {
                 player.state = "walking";
                 setPlayerState("walking");
             }
+            const prevDir = player.direction;
             if (vy > 0) player.direction = "down";
             else if (vy < 0) player.direction = "up";
             else if (vx < 0) player.direction = "left";
             else if (vx > 0) player.direction = "right";
+
+            if (player.direction !== prevDir) {
+                onPlayerStateChange(player);
+            }
 
             // Compensate speed across browser zoom levels and delta-time so movement stays constant
             const dtFactor = Math.min(Math.max(dt / (1000 / 60), 0.5), 2.5);
@@ -785,7 +749,7 @@ export default function ArenaPage() {
             animAccRef.current += dt;
             const mspf = 1000 / RUN_FPS;
             if (animAccRef.current >= mspf) {
-                player.currentFrame = (player.currentFrame % TOTAL_ANIM_FRAMES) + 1;
+                player.currentFrame = (player.currentFrame % FRAMES_PER_DIR) + 1;
                 animAccRef.current -= mspf;
                 onPlayerStateChange(player);
             }
@@ -793,12 +757,15 @@ export default function ArenaPage() {
             if (player.state === "walking") {
                 player.state = "idle";
                 setPlayerState("idle");
+                player.currentFrame = 1;
+                animAccRef.current = 0;
+                onPlayerStateChange(player);
             }
-            // Loop idle anim frames slowly
+            // Loop idle anim frames slowly within current direction
             animAccRef.current += dt;
             const mspf = 1000 / IDLE_FPS;
             if (animAccRef.current >= mspf) {
-                player.currentFrame = (player.currentFrame % TOTAL_ANIM_FRAMES) + 1;
+                player.currentFrame = (player.currentFrame % FRAMES_PER_DIR) + 1;
                 animAccRef.current -= mspf;
             }
         } else if (player.state === "sitting") {
@@ -961,7 +928,6 @@ export default function ArenaPage() {
                     currentFrame: player.currentFrame,
                     username: currentUsername,
                     isLocal: true,
-                    chatMessage: activeChatMessage,
                 },
             });
 
@@ -1123,7 +1089,7 @@ export default function ArenaPage() {
         }
 
         rafRef.current = requestAnimationFrame((ts) => gameLoopRef.current?.(ts));
-    }, [currentUsername, activeChatMessage, onPlayerStateChange]);
+    }, [currentUsername, onPlayerStateChange]);
 
     useEffect(() => {
         gameLoopRef.current = gameLoop;
@@ -1239,23 +1205,12 @@ export default function ArenaPage() {
         return () => {
             cancelled = true;
             cancelAnimationFrame(rafRef.current);
-            if (chatTimeoutRef.current) {
-                clearTimeout(chatTimeoutRef.current);
-            }
         };
     }, [gameLoop]);
 
     // ── Keyboard events ───────────────────────────────────────────────────
     useEffect(() => {
         const onDown = (e: KeyboardEvent) => {
-            // Exclude keystrokes when typing inside chat or other input elements
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-                if (e.key === "Enter") {
-                    handleSendMessage();
-                }
-                return;
-            }
-
             const keyLower = e.key.toLowerCase();
             const codeLower = e.code.toLowerCase();
 
@@ -1308,9 +1263,6 @@ export default function ArenaPage() {
         };
 
         const onUp = (e: KeyboardEvent) => {
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-                return;
-            }
             const keyLower = e.key.toLowerCase();
             const codeLower = e.code.toLowerCase();
             keysRef.current.delete(keyLower);
@@ -1330,9 +1282,19 @@ export default function ArenaPage() {
             window.removeEventListener("keyup",   onUp);
             window.removeEventListener("blur",    onBlur);
         };
-    }, [handleSendMessage, onPlayerStateChange]);
+    }, [onPlayerStateChange]);
 
-    const activeCharOption = CHARACTER_OPTIONS.find((c) => c.id === selectedCharacter) || CHARACTER_OPTIONS[0];
+    // Clear display name when exiting the game
+    useEffect(() => {
+        const onUnload = () => {
+            localStorage.removeItem("alterverse_display_name");
+        };
+        window.addEventListener("beforeunload", onUnload);
+        return () => {
+            window.removeEventListener("beforeunload", onUnload);
+            localStorage.removeItem("alterverse_display_name");
+        };
+    }, []);
 
     // ── Render ────────────────────────────────────────────────────────────
     return (
@@ -1380,7 +1342,7 @@ export default function ArenaPage() {
                 </div>
             </div>
 
-            {/* ── Prominent HUD: top-right (Character Selector, Collision debug toggle, Player badge & Leave button) ─── */}
+            {/* ── Prominent HUD: top-right (Collision debug toggle, Player badge & Leave button) ─── */}
             <div
                 style={{
                     position: "absolute",
@@ -1391,30 +1353,6 @@ export default function ArenaPage() {
                     gap: 10,
                 }}
             >
-                {/* Character Picker trigger button */}
-                <button
-                    onClick={() => setShowCharacterPicker(true)}
-                    title="Change character skin"
-                    style={{
-                        padding: "7px 14px",
-                        borderRadius: 10,
-                        background: "rgba(9, 7, 24, 0.76)",
-                        border: "1px solid rgba(196, 181, 253, 0.3)",
-                        backdropFilter: "blur(12px)",
-                        fontSize: 13,
-                        color: "#c4b5fd",
-                        cursor: "pointer",
-                        fontWeight: 600,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        transition: "all 0.15s ease",
-                    }}
-                >
-                    <Sparkles size={14} />
-                    <span>Character: <strong style={{ color: "#ffffff" }}>{activeCharOption.label}</strong></span>
-                </button>
-
                 {/* Collision & element debug toggle button */}
                 <button
                     onClick={() => setDebugMode((prev) => !prev)}
@@ -1480,7 +1418,10 @@ export default function ArenaPage() {
 
                 {/* Leave button */}
                 <button
-                    onClick={() => navigate(-1)}
+                    onClick={() => {
+                        localStorage.removeItem("alterverse_display_name");
+                        navigate(-1);
+                    }}
                     style={{
                         padding: "7px 16px",
                         borderRadius: 10,
@@ -1497,319 +1438,6 @@ export default function ArenaPage() {
                     ✕ Leave
                 </button>
             </div>
-
-            {/* ── Prominent HUD: bottom-left (Controls hint) ─── */}
-            <div
-                style={{
-                    position: "absolute",
-                    bottom: 18,
-                    left: 18,
-                    padding: "6px 14px",
-                    borderRadius: 8,
-                    background: "rgba(9, 7, 24, 0.58)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    fontSize: 12,
-                    color: "#94a3b8",
-                    userSelect: "none",
-                    pointerEvents: "none",
-                    fontFamily: "monospace",
-                    letterSpacing: "0.05em",
-                }}
-            >
-                {playerState === "sitting" ? "[WASD / E] Stand up" : "WASD to move • [E] Sit"}
-            </div>
-
-            {/* ── Chat HUD Integration (specs/11-change-character.md) ─── */}
-            <div
-                style={{
-                    position: "absolute",
-                    bottom: 18,
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    background: "rgba(15, 23, 42, 0.85)",
-                    border: "1px solid rgba(255, 255, 255, 0.15)",
-                    backdropFilter: "blur(12px)",
-                    borderRadius: 12,
-                    padding: "6px 10px 6px 14px",
-                    width: "min(520px, calc(100vw - 320px))",
-                    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
-                    zIndex: 20,
-                }}
-            >
-                <MessageSquare size={16} color="#94a3b8" />
-                <input
-                    type="text"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="Type speech bubble or /name <newName>..."
-                    style={{
-                        flex: 1,
-                        background: "transparent",
-                        border: "none",
-                        outline: "none",
-                        color: "#f8fafc",
-                        fontSize: 13,
-                        fontFamily: "'Inter', system-ui, sans-serif",
-                    }}
-                />
-                <button
-                    onClick={handleSendMessage}
-                    style={{
-                        padding: "6px 12px",
-                        borderRadius: 8,
-                        background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                        border: "none",
-                        color: "#ffffff",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                    }}
-                >
-                    <span>Send</span>
-                    <Send size={12} />
-                </button>
-            </div>
-
-            {/* ── Character Picker UI Overlay (specs/11-change-character.md) ─── */}
-            {showCharacterPicker && (
-                <div
-                    style={{
-                        position: "fixed",
-                        inset: 0,
-                        background: "rgba(9, 7, 24, 0.8)",
-                        backdropFilter: "blur(16px)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        zIndex: 100,
-                        padding: 24,
-                    }}
-                >
-                    <div
-                        style={{
-                            background: "linear-gradient(180deg, #18152e 0%, #0f0d1f 100%)",
-                            border: "1px solid rgba(168, 85, 247, 0.35)",
-                            borderRadius: 20,
-                            padding: 32,
-                            width: "min(880px, 100%)",
-                            boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 40px rgba(168, 85, 247, 0.15)",
-                            position: "relative",
-                        }}
-                    >
-                        {/* Close button */}
-                        <button
-                            onClick={() => setShowCharacterPicker(false)}
-                            style={{
-                                position: "absolute",
-                                top: 20,
-                                right: 20,
-                                background: "rgba(255, 255, 255, 0.06)",
-                                border: "1px solid rgba(255, 255, 255, 0.1)",
-                                borderRadius: 8,
-                                padding: 6,
-                                color: "#94a3b8",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                            }}
-                        >
-                            <X size={18} />
-                        </button>
-
-                        {/* Header */}
-                        <div style={{ textAlign: "center", marginBottom: 28 }}>
-                            <div
-                                style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: 8,
-                                    padding: "4px 12px",
-                                    borderRadius: 999,
-                                    background: "rgba(168, 85, 247, 0.15)",
-                                    border: "1px solid rgba(168, 85, 247, 0.3)",
-                                    fontSize: 12,
-                                    color: "#d8b4fe",
-                                    fontWeight: 600,
-                                    marginBottom: 10,
-                                }}
-                            >
-                                <Sparkles size={13} />
-                                <span>CHARACTER SELECTION</span>
-                            </div>
-                            <h2
-                                style={{
-                                    fontSize: 26,
-                                    fontWeight: 700,
-                                    color: "#f8fafc",
-                                    margin: "0 0 6px 0",
-                                    letterSpacing: "-0.02em",
-                                }}
-                            >
-                                Choose Your Character
-                            </h2>
-                            <p style={{ fontSize: 14, color: "#94a3b8", margin: 0 }}>
-                                Select an avatar with 24-frame walking, breathing idle, and 4-way sitting
-                            </p>
-                        </div>
-
-                        {/* 4 Preview Cards */}
-                        <div
-                            style={{
-                                display: "grid",
-                                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                                gap: 16,
-                                marginBottom: 24,
-                            }}
-                        >
-                            {CHARACTER_OPTIONS.map((char) => {
-                                const isSelected = selectedCharacter === char.id;
-                                return (
-                                    <div
-                                        key={char.id}
-                                        onClick={() => handleSelectCharacter(char.id)}
-                                        style={{
-                                            background: isSelected
-                                                ? "linear-gradient(180deg, rgba(168, 85, 247, 0.22) 0%, rgba(126, 34, 206, 0.15) 100%)"
-                                                : "rgba(255, 255, 255, 0.03)",
-                                            border: isSelected
-                                                ? "2px solid #a855f7"
-                                                : "1px solid rgba(255, 255, 255, 0.08)",
-                                            borderRadius: 16,
-                                            padding: 20,
-                                            display: "flex",
-                                            flexDirection: "column",
-                                            alignItems: "center",
-                                            cursor: "pointer",
-                                            transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                                            boxShadow: isSelected
-                                                ? "0 0 25px rgba(168, 85, 247, 0.35)"
-                                                : "none",
-                                            position: "relative",
-                                        }}
-                                    >
-                                        {isSelected && (
-                                            <div
-                                                style={{
-                                                    position: "absolute",
-                                                    top: 10,
-                                                    right: 10,
-                                                    width: 22,
-                                                    height: 22,
-                                                    borderRadius: "50%",
-                                                    background: "#a855f7",
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    justifyContent: "center",
-                                                    color: "#ffffff",
-                                                }}
-                                            >
-                                                <Check size={14} />
-                                            </div>
-                                        )}
-
-                                        {/* Avatar Preview Box */}
-                                        <div
-                                            style={{
-                                                width: 80,
-                                                height: 110,
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                background: "rgba(0, 0, 0, 0.3)",
-                                                borderRadius: 12,
-                                                marginBottom: 14,
-                                                border: "1px solid rgba(255, 255, 255, 0.05)",
-                                            }}
-                                        >
-                                            <img
-                                                src={char.preview}
-                                                alt={char.fullName}
-                                                style={{
-                                                    width: 64,
-                                                    height: 96,
-                                                    objectFit: "contain",
-                                                    imageRendering: "pixelated",
-                                                }}
-                                            />
-                                        </div>
-
-                                        <div style={{ textAlign: "center" }}>
-                                            <div
-                                                style={{
-                                                    fontSize: 16,
-                                                    fontWeight: 700,
-                                                    color: "#f8fafc",
-                                                    marginBottom: 3,
-                                                }}
-                                            >
-                                                {char.label}
-                                            </div>
-                                            <div
-                                                style={{
-                                                    fontSize: 11,
-                                                    color: "#c4b5fd",
-                                                    fontFamily: "monospace",
-                                                    textTransform: "uppercase",
-                                                    marginBottom: 6,
-                                                }}
-                                            >
-                                                {char.house}
-                                            </div>
-                                            <div
-                                                style={{
-                                                    fontSize: 12,
-                                                    color: "#94a3b8",
-                                                    lineHeight: 1.3,
-                                                }}
-                                            >
-                                                {char.description}
-                                            </div>
-                                        </div>
-
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleSelectCharacter(char.id);
-                                            }}
-                                            style={{
-                                                marginTop: 14,
-                                                width: "100%",
-                                                padding: "7px 0",
-                                                borderRadius: 8,
-                                                background: isSelected
-                                                    ? "#a855f7"
-                                                    : "rgba(255, 255, 255, 0.08)",
-                                                border: "none",
-                                                color: "#ffffff",
-                                                fontSize: 12,
-                                                fontWeight: 600,
-                                                cursor: "pointer",
-                                                transition: "background 0.15s ease",
-                                            }}
-                                        >
-                                            {isSelected ? "Selected" : "Select"}
-                                        </button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {/* Footer prompt */}
-                        <div style={{ textAlign: "center" }}>
-                            <span style={{ fontSize: 13, color: "#64748b" }}>
-                                You can change characters anytime via the Character button in the top bar.
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
