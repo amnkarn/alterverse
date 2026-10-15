@@ -2,12 +2,11 @@ FROM oven/bun:1 AS base
 
 WORKDIR /app
 
+# Copy all package and lockfiles
 COPY package.json bun.lock ./
 COPY turbo.json ./
-
 COPY packages/db/package.json ./packages/db/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
-
 COPY apps/backend/package.json ./apps/backend/
 
 RUN bun install
@@ -18,7 +17,7 @@ COPY . .
 RUN bun db:generate
 
 # build the backend(root script)
-RUN bun build:backend
+RUN bun run build:backend
 
 EXPOSE 8080
 

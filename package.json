@@ -14,6 +14,10 @@
     "test": "turbo run test",
     "build:backend": "cd apps/backend && bun run build",
     "start:backend": "cd apps/backend && bun run ./src/server.ts",
+
+    "build:web": "cd apps/web && bun run build",
+    "start:web": "cd apps/web && bun run start",
+    "start:ws": "cd apps/ws && bun run ./src/index.ts",
     "db:generate": "cd packages/db && bunx prisma generate && cd ../.."
   },
   "devDependencies": {
