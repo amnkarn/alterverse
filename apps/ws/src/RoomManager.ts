@@ -31,9 +31,9 @@ export class RoomManager {
             return;
         }
         
-        const room = this.rooms.get(spaceId);
-
-        this.rooms.set(spaceId, room!.filter((u) => u.id !== user.id));
+        const room = this.rooms.get(spaceId)!.filter((u) => u.id !== user.id);
+        if (room.length === 0) this.rooms.delete(spaceId);
+        else this.rooms.set(spaceId, room);
     }
 
     public broadcast(message: OutgoingMessage, user: User, roomId: string) {

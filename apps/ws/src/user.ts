@@ -1,182 +1,184 @@
-import "dotenv/config"
 import WebSocket from "ws";
-import { prismaClient } from "@repo/db/client"
+import { prismaClient } from "@repo/db/client";
 import { RoomManager } from "./RoomManager.js";
-import { OutgoingMessage } from "./types.js";
-import jwt, {JwtPayload} from "jsonwebtoken";
-import { JWT_SECRET } from "./config.js";
+import type { Direction, OutgoingMessage, Player, PlayerState } from "./types.js";
 
-function getRandomString(length: number) {
-    const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let result = "";
-    for (let i = 0; i < length; i++) {
-        result += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    return result;
-}
+const DEMO_SPACE_ID = "demo-space";
+const DEMO_MAP_WIDTH = 1280;
+const DEMO_MAP_HEIGHT = 960;
 
+type AuthenticatedUser = {
+  id: string;
+  name: string;
+};
+
+export type AuthenticatedUserPromise = Promise<AuthenticatedUser | null>;
+
+type JoinPayload = {
+  spaceId?: string;
+  displayName?: string;
+  avatarId?: string;
+  character?: string;
+};
 
 export class User {
-    public id: string;
-    public userId?: string;
-    private spaceId?: string;
-    private x: number;
-    private y: number;
-    private ws: WebSocket;
+  public readonly id = crypto.randomUUID();
+  private readonly ws: WebSocket;
+  private readonly authenticatedUserPromise: AuthenticatedUserPromise;
+  private authenticatedUser?: AuthenticatedUser;
+  private player?: Player;
 
-    constructor(ws: WebSocket) {
-        this.id = getRandomString(10);
-        this.x = 0;
-        this.y = 0;
-        this.ws = ws;
-        this.initHandler();
+  constructor(ws: WebSocket, userPromise: AuthenticatedUserPromise) {
+    this.ws = ws;
+    this.authenticatedUserPromise = userPromise;
+    this.initHandler();
+  }
+
+  private async join(payload: JoinPayload) {
+    if (this.player) return;
+    if (!this.authenticatedUser) return;
+
+    const spaceId = payload.spaceId ?? DEMO_SPACE_ID;
+    let width = DEMO_MAP_WIDTH;
+    let height = DEMO_MAP_HEIGHT;
+
+    if (spaceId !== DEMO_SPACE_ID) {
+      const space = await prismaClient.space.findUnique({
+        where: { id: spaceId },
+        select: { width: true, height: true },
+      });
+
+      if (!space) {
+        this.send({ type: "error", payload: { message: "Space not found" } });
+        this.ws.close(1008, "Space not found");
+        return;
+      }
+
+      width = space.width;
+      height = space.height;
     }
 
-    initHandler() {
-        this.ws.on("message", async (data) => {
-            const parsedData = JSON.parse(data.toString());
-            
-            switch(parsedData.type) {
-                case "join":
-                    const spaceId = parsedData.payload.spaceId;
-                    const token = parsedData.payload.token;
-                    console.log({
-                        "spaceId": spaceId,
-                        "token": token
-                    })
+    const room = RoomManager.getInstance();
+    const roomSize = room.rooms.get(spaceId)?.length ?? 0;
+    const spawnIndex = roomSize % 8;
+    const spawnX = 400 + (spawnIndex % 4) * 120;
+    const spawnY = 300 + Math.floor(spawnIndex / 4) * 120;
 
-                    const decodeToken = jwt.verify(token, JWT_SECRET) as JwtPayload;
-                    const userId = decodeToken.userId;
-                    this.userId = userId;
-                    if(!userId) {
-                        this.ws.close();
-                        return;
-                    }
-                    console.log("userId is: ", userId);
+    const player: Player = {
+      playerId: this.id,
+      userId: this.authenticatedUser.id,
+      spaceId,
+      displayName: payload.displayName?.trim() || this.authenticatedUser.name || "Player",
+      avatarId: payload.avatarId,
+      character: payload.character,
+      x: Math.min(spawnX, width - 24),
+      y: Math.min(spawnY, height - 24),
+      direction: "down",
+      state: "idle",
+      frame: 1,
+    };
 
-                    const space = await prismaClient.space.findUnique({
-                        where: {
-                            id: spaceId,
-                        }
-                    })
-                    if(!space) {
-                        this.ws.close();
-                        return;
-                    }
-                    this.spaceId = spaceId;
-                    const room = RoomManager.getInstance();
-                    room.addUser(spaceId, this);
-                    console.log("user is added in space");
-                    
-                    this.x = Math.floor(Math.random() * space.height);
-                    this.y = Math.floor(Math.random() * space.width);
+    this.player = player;
+    room.addUser(spaceId, this);
 
-                    this.send({
-                        type: "space-joined",
-                        payload: {
-                            spawn: {
-                                x: this.x,
-                                y: this.y    
-                            },
-                            users: room.rooms.get(spaceId)
-                                ?.filter((u) => u.id !== this.id)
-                                .map((u) => ({
-                                    userId: u.userId,
-                                    x: u.x,
-                                    y: u.y
-                                })) ?? []
-                        }
-                    })
+    const users = room.rooms.get(spaceId)
+      ?.filter((user) => user !== this)
+      .map((user) => user.getPlayer())
+      .filter((item): item is Player => Boolean(item)) ?? [];
 
-                    room.broadcast({
-                        type: "user-joined",
-                        payload: {
-                            userId: this.userId,
-                            x: this.x,
-                            y: this.y
-                        }
-                    }, this, spaceId)
-                    console.log("broadcasted to everyone");
-                    break;
+    this.send({
+      type: "space-joined",
+      payload: { self: player, users },
+    });
 
-                case "move":
-                    const moveX = parsedData.payload.x;
-                    const moveY = parsedData.payload.y;
-                    const xDisplacement = Math.abs(this.x - moveX);
-                    const yDisplacement = Math.abs(this.y - moveY);
-                    console.log("move req is reached to server");
-                    console.log({
-                        "moveX": moveX,
-                        "moveY": moveY,
-                    })
+    room.broadcast(
+      { type: "user-joined", payload: player },
+      this,
+      spaceId,
+    );
+    console.log(`[ws] ${player.displayName} joined ${spaceId}; users=${room.rooms.get(spaceId)?.length ?? 0}`);
+  }
 
-                    if ((xDisplacement === 1 && yDisplacement === 0) || (xDisplacement === 0 && yDisplacement === 1)) {
-                        this.x = moveX;
-                        this.y = moveY;
+  private handleMovement(payload: Record<string, unknown>) {
+    if (!this.player) return;
 
-                        RoomManager.getInstance().broadcast({
-                            type: "movement",
-                            payload: {
-                                x: moveX,
-                                y: moveY,
-                                userId: this.userId
-                            }
-                        }, this, this.spaceId!)
-                        console.log("move is broadcasted to everyone");
-
-                        return;
-                    }
-
-                    this.send({
-                        type: "movement-rejected",
-                        payload: {
-                            x: this.x,
-                            y: this.y,
-                        }
-                    })
-                    console.log("movement rejected becase of invaid move");
-                    break;
-
-                case "player-state":
-                    if (this.spaceId) {
-                        const targetUserId = this.userId || parsedData.playerId || this.id;
-                        if (typeof parsedData.x === "number") this.x = parsedData.x;
-                        if (typeof parsedData.y === "number") this.y = parsedData.y;
-                        RoomManager.getInstance().broadcast({
-                            type: "player-state",
-                            payload: {
-                                userId: targetUserId,
-                                playerId: targetUserId,
-                                state: parsedData.state,
-                                x: parsedData.x,
-                                y: parsedData.y,
-                                direction: parsedData.direction,
-                            }
-                        }, this, this.spaceId);
-                    }
-                    break;
-            }
-
-        })
+    if (typeof payload.x === "number") this.player.x = payload.x;
+    if (typeof payload.y === "number") this.player.y = payload.y;
+    if (typeof payload.direction === "string") {
+      this.player.direction = payload.direction as Direction;
     }
+    if (typeof payload.state === "string") {
+      this.player.state = payload.state as PlayerState;
+    }
+    if (typeof payload.frame === "number") this.player.frame = payload.frame;
+    if (typeof payload.character === "string") this.player.character = payload.character;
 
-    destroy() {
-        if (!this.spaceId || !this.userId) {
-            return;
+    RoomManager.getInstance().broadcast(
+      { type: "movement", payload: this.player },
+      this,
+      this.player.spaceId,
+    );
+  }
+
+  private initHandler() {
+    this.ws.on("message", async (data) => {
+      try {
+        if (!this.authenticatedUser) {
+          const authenticatedUser = await this.authenticatedUserPromise;
+          if (authenticatedUser) this.authenticatedUser = authenticatedUser;
+        }
+        if (!this.authenticatedUser) {
+          this.ws.close(1008, "Unauthorized");
+          return;
         }
 
-        const room = RoomManager.getInstance();
-        room.removeUser(this, this.spaceId);
-        room.broadcast({
-            type: "user-left",
-            payload: {
-                userId: this.userId,
-            }
-        }, this, this.spaceId);
-        console.log("user left");
-    }
+        const message = JSON.parse(data.toString()) as {
+          type?: string;
+          payload?: Record<string, unknown>;
+        };
 
-    send(payload: OutgoingMessage) {
-        this.ws.send(JSON.stringify(payload));
+        switch (message.type) {
+          case "join":
+            console.log(`[ws] join received from ${this.authenticatedUser.id}`);
+            await this.join((message.payload ?? {}) as JoinPayload);
+            break;
+          case "move":
+          case "player-state":
+            this.handleMovement(message.payload ?? message);
+            break;
+          case "leave":
+            this.destroy();
+            break;
+          default:
+            this.send({ type: "error", payload: { message: "Unknown message type" } });
+        }
+      } catch (error) {
+        console.error("Invalid WebSocket message:", error);
+        this.send({ type: "error", payload: { message: "Invalid message" } });
+      }
+    });
+  }
+
+  getPlayer() {
+    return this.player;
+  }
+
+  destroy() {
+    if (!this.player) return;
+
+    const { spaceId, userId } = this.player;
+    const room = RoomManager.getInstance();
+    room.removeUser(this, spaceId);
+    room.broadcast({
+      type: "user-left",
+      payload: { playerId: this.id, userId },
+    }, this, spaceId);
+    this.player = undefined;
+  }
+
+  send(message: OutgoingMessage) {
+    if (this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message));
     }
+  }
 }

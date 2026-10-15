@@ -372,6 +372,11 @@ function drawElement(
     );
 }
 
+function isForegroundElement(element: MapElement) {
+    const layer = (element.layerName ?? "").toLowerCase();
+    return layer === "wall" || layer.includes("oncollide");
+}
+
 function drawPlayer(
     ctx: CanvasRenderingContext2D,
     charactersMap: Map<CharacterId, CharacterFrameSet>,
@@ -480,7 +485,7 @@ function drawPlayer(
     ctx.restore();
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+
 
 export default function ArenaPage() {
     const navigate          = useNavigate();
@@ -529,6 +534,7 @@ export default function ArenaPage() {
             (typeof window !== "undefined" ? localStorage.getItem("alterverse_avatar_name") : null)
     );
     const currentUsername = displayName;
+    const currentSpaceId = navState?.spaceId || "demo-space";
 
     const playerRef = useRef<{
         name: CharacterId;
@@ -578,6 +584,106 @@ export default function ArenaPage() {
     const [, setPlayerState] = useState<PlayerState>("idle");
     const seatedElementRef = useRef<MapElement | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
+    const localPlayerIdRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        const wsUrl = "ws://localhost:3001";
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+            console.log("Connected to websocket server", { spaceId: currentSpaceId });
+            ws.send(JSON.stringify({
+                type: "join",
+                payload: {
+                    spaceId: currentSpaceId,
+                    displayName,
+                    avatarId: navState?.avatarId || navState?.avatar?.id,
+                    character: initialCharacter,
+                },
+            }));
+        };
+
+        ws.onmessage = (event) => {
+            const message = JSON.parse(event.data) as {
+                type: string;
+                payload?: any;
+            };
+            console.log("WebSocket message:", message);
+
+            if (message.type === "space-joined") {
+                const self = message.payload?.self;
+                if (self) {
+                    localPlayerIdRef.current = self.playerId;
+                    playerRef.current.globalX = self.x;
+                    playerRef.current.globalY = self.y;
+                    playerRef.current.direction = self.direction || "down";
+                }
+
+                remotePlayersRef.current.clear();
+                for (const user of message.payload?.users || []) {
+                    remotePlayersRef.current.set(user.playerId, {
+                        id: user.playerId,
+                        playerId: user.playerId,
+                        x: user.x,
+                        y: user.y,
+                        direction: user.direction || "down",
+                        frame: user.frame || 1,
+                        displayName: user.displayName || "Player",
+                        state: user.state || "idle",
+                        character: user.character as CharacterId | undefined,
+                    });
+                }
+                console.log("Remote players after join:", remotePlayersRef.current.size);
+            } else if (message.type === "user-joined" || message.type === "movement") {
+                const user = message.payload;
+                if (user?.playerId && user.playerId !== localPlayerIdRef.current) {
+                    remotePlayersRef.current.set(user.playerId, {
+                        id: user.playerId,
+                        playerId: user.playerId,
+                        x: user.x,
+                        y: user.y,
+                        direction: user.direction || "down",
+                        frame: user.frame || 1,
+                        displayName: user.displayName || "Player",
+                        state: user.state || "idle",
+                        character: user.character as CharacterId | undefined,
+                    });
+                    console.log("Remote player updated:", user.playerId, "total:", remotePlayersRef.current.size);
+                }
+            } else if (message.type === "user-left") {
+                remotePlayersRef.current.delete(message.payload?.playerId);
+            }
+        };
+
+        ws.onerror = (event) => {
+            console.error("WebSocket error:", event);
+        };
+
+        ws.onclose = () => {
+            if (wsRef.current === ws) wsRef.current = null;
+        };
+
+        const leaveArena = () => {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "leave" }));
+                ws.close();
+            }
+        };
+
+        window.addEventListener("pagehide", leaveArena);
+        window.addEventListener("beforeunload", leaveArena);
+
+        return () => {
+            window.removeEventListener("pagehide", leaveArena);
+            window.removeEventListener("beforeunload", leaveArena);
+            leaveArena();
+            if (ws.readyState !== WebSocket.CLOSED) ws.close();
+            remotePlayersRef.current.clear();
+            localPlayerIdRef.current = null;
+            if (wsRef.current === ws) wsRef.current = null;
+        };
+    }, [currentSpaceId, displayName, initialCharacter, navState?.avatarId, navState?.avatar?.id, session?.user?.id]);
 
     // ── Packet hook: onPlayerStateChange ──────────────────────────────────
     const onPlayerStateChange = useCallback(
@@ -590,19 +696,17 @@ export default function ArenaPage() {
             globalX: number;
             globalY: number;
         }) => {
-            const playerId = session?.user?.id || "user-" + (player.username || "player");
             const payload = {
                 type: "player-state",
-                playerId,
-                character: player.name,
-                username: player.username,
-                state: player.state,
-                direction: player.direction,
-                currentFrame: player.currentFrame,
-                globalX: player.globalX,
-                globalY: player.globalY,
-                x: player.globalX,
-                y: player.globalY,
+                payload: {
+                    x: player.globalX,
+                    y: player.globalY,
+                    state: player.state,
+                    direction: player.direction,
+                    frame: player.currentFrame,
+                    character: player.name,
+                    displayName: player.username,
+                },
             };
             if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                 wsRef.current.send(JSON.stringify(payload));
@@ -927,8 +1031,18 @@ export default function ArenaPage() {
                 },
             });
 
-            // Depth sort: primary key depthY, secondary key layer priority
+            // Render foreground wall/object layers after players so they can
+            // occlude the avatar where Tiled marks them as OnCollide.
             entities.sort((a, b) => {
+                const band = (entity: RenderEntity) => {
+                    if (entity.kind === "element") {
+                        return isForegroundElement(entity.element) ? 2 : 0;
+                    }
+                    return 1;
+                };
+
+                const bandDifference = band(a) - band(b);
+                if (bandDifference !== 0) return bandDifference;
                 if (a.depthY !== b.depthY) {
                     return a.depthY - b.depthY;
                 }

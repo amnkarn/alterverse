@@ -93,6 +93,7 @@ export type PlayerState = "idle" | "walking" | "sitting";
 export type CharacterId = "Harry" | "Hermoine" | "Ron" | "Ginny";
 
 export interface RemotePlayer {
+    playerId?: string;
     id: string;
     x: number;
     y: number;

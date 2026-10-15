@@ -12033,64 +12033,70 @@
             "height": 32
         },
         {
-            "id": "objects-378",
-            "elementId": "objects",
-            "layerName": "Objects",
-            "gid": 2782,
-            "x": 192,
-            "y": 320,
-            "width": 32,
-            "height": 32
+                    "id": "objects-378",
+                    "elementId": "objects",
+                    "layerName": "Objects",
+                    "gid": 2782,
+                    "x": 192,
+                    "y": 320,
+                    "width": 32,
+                    "height": 32,
+                    "collision": { "x": 0, "y": 0, "width": 32, "height": 32 }
         },
         {
-            "id": "objects-379",
-            "elementId": "objects",
-            "layerName": "Objects",
-            "gid": 2782,
-            "x": 320,
-            "y": 320,
-            "width": 32,
-            "height": 32
+                    "id": "objects-379",
+                    "elementId": "objects",
+                    "layerName": "Objects",
+                    "gid": 2782,
+                    "x": 320,
+                    "y": 320,
+                    "width": 32,
+                    "height": 32,
+                    "collision": { "x": 0, "y": 0, "width": 32, "height": 32 }
         },
         {
-            "id": "objects-380",
-            "elementId": "objects",
-            "layerName": "Objects",
-            "gid": 2798,
-            "x": 192,
-            "y": 352,
-            "width": 32,
-            "height": 32
+                    "id": "objects-380",
+                    "elementId": "objects",
+                    "layerName": "Objects",
+                    "gid": 2798,
+                    "x": 192,
+                    "y": 352,
+                    "width": 32,
+                    "height": 32,
+                    "collision": { "x": 0, "y": 0, "width": 32, "height": 32 }
         },
         {
-            "id": "objects-381",
-            "elementId": "objects",
-            "layerName": "Objects",
-            "gid": 2798,
-            "x": 320,
-            "y": 352,
-            "width": 32,
-            "height": 32
+                    "id": "objects-381",
+                    "elementId": "objects",
+                    "layerName": "Objects",
+                    "gid": 2798,
+                    "x": 320,
+                    "y": 352,
+                    "width": 32,
+                    "height": 32,
+                    "collision": { "x": 0, "y": 0, "width": 32, "height": 32 }
         },
         {
-            "id": "objects-390",
-            "elementId": "objects",
-            "layerName": "Objects",
-            "gid": 2782,
-            "x": 448,
-            "y": 320,
-            "width": 32,
-            "height": 32
+                    "id": "objects-390",
+                    "elementId": "objects",
+                    "layerName": "Objects",
+                    "gid": 2782,
+                    "x": 448,
+                    "y": 320,
+                    "width": 32,
+                    "height": 32,
+                    "collision": { "x": 0, "y": 0, "width": 32, "height": 32 }
         },
         {
-            "id": "objects-391",
-            "elementId": "objects",
-            "layerName": "Objects",
-            "gid": 2798,
-            "x": 448,
-            "y": 352,
-            "width": 32,
-            "height": 32
+                    "id": "objects-391",
+                    "elementId": "objects",
+                    "layerName": "Objects",
+                    "gid": 2798,
+                    "x": 448,
+                    "y": 352,
+                    "width": 32,
+                    "height": 32,
+                    "collision": { "x": 0, "y": 0, "width": 32, "height": 32 }
         },
         {
             "id": "objects-393",
@@ -16035,7 +16041,8 @@
             "x": 480,
             "y": 224,
             "width": 32,
-            "height": 32
+            "height": 32,
+            "collision": { "x": 16, "y": 16, "width": 32, "height": 64 }
         },
         {
             "id": "basement-1194",
@@ -16135,7 +16142,8 @@
             "x": 224,
             "y": 225,
             "width": 32,
-            "height": 32
+            "height": 32,
+            "collision": { "x": 16, "y": 16, "width": 96, "height": 64 }
         },
         {
             "id": "basement-1231",
