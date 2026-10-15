@@ -90,6 +90,8 @@ export type CollisionRect = {
 
 export type PlayerState = "idle" | "walking" | "sitting";
 
+export type CharacterId = "Harry" | "Hermoine" | "Ron" | "Ginny";
+
 export interface RemotePlayer {
     id: string;
     x: number;
@@ -98,4 +100,6 @@ export interface RemotePlayer {
     frame: number;
     displayName: string;
     state?: PlayerState;
+    character?: CharacterId;
+    chatMessage?: string;
 }

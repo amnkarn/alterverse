@@ -2,27 +2,118 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../lib/auth-client";
 import { demoSpace } from "../data/demo-data";
-import type { GameMap, CollisionRect, RemotePlayer, MapElement, TilesetDef, PlayerState } from "../types/map";
+import type { GameMap, CollisionRect, RemotePlayer, MapElement, TilesetDef, PlayerState, CharacterId } from "../types/map";
 import { buildCollisionRectangles, canMoveTo, scaleGameMap } from "../game/collision";
+import { Sparkles, X, MessageSquare, Send, Check } from "lucide-react";
 
 // ─── Scale & Zoom Config ──────────────────────────────────────────────────────
 // Zooms map tiles, walls, and background without changing avatar size
-export const MAP_SCALE = 1.8;
+const MAP_SCALE = 1.8;
 
-// ─── Sprite / Player Config ───────────────────────────────────────────────────
-// Spritesheet: 256×64, 4 frames × 64 px each per direction
-const SPRITE_FRAME_W  = 64;
-const SPRITE_FRAME_H  = 64;
-const SPRITE_FRAMES   = 4;
-const SPRITE_FPS      = 10;
-// Render player at 3× scale (kept unchanged per user preference)
-const PLAYER_SCALE    = 3;
-const PLAYER_RENDER_W = SPRITE_FRAME_W * PLAYER_SCALE; // 192 px
-const PLAYER_RENDER_H = SPRITE_FRAME_H * PLAYER_SCALE; // 192 px
+// ─── Character Options & Config (specs/11-change-character.md) ─────────────────
+interface CharacterOption {
+    id: CharacterId;
+    label: string;
+    fullName: string;
+    house: string;
+    description: string;
+    preview: string;
+}
+
+const CHARACTER_OPTIONS: CharacterOption[] = [
+    {
+        id: "Harry",
+        label: "Harry",
+        fullName: "Harry Potter",
+        house: "Gryffindor",
+        description: "The Boy Who Lived",
+        preview: "/assets/character/single/Harry_idle_anim_1.png",
+    },
+    {
+        id: "Hermoine",
+        label: "Hermione",
+        fullName: "Hermione Granger",
+        house: "Gryffindor",
+        description: "Brightest Witch of Her Age",
+        preview: "/assets/character/single/Hermoine_idle_anim_1.png",
+    },
+    {
+        id: "Ron",
+        label: "Ron",
+        fullName: "Ron Weasley",
+        house: "Gryffindor",
+        description: "Loyal Strategist & Keeper",
+        preview: "/assets/character/single/Ron_idle_anim_1.png",
+    },
+    {
+        id: "Ginny",
+        label: "Ginny",
+        fullName: "Ginny Weasley",
+        house: "Gryffindor",
+        description: "Fierce Chaser & Duellist",
+        preview: "/assets/character/single/Ginny_idle_anim_1.png",
+    },
+];
+
+// Single frame dimensions: 32×48 px per spec
+const CHAR_FRAME_W = 32;
+const CHAR_FRAME_H = 48;
+const CHAR_SCALE   = 2.2;
+const CHAR_RENDER_W = Math.round(CHAR_FRAME_W * CHAR_SCALE); // ~70 px
+const CHAR_RENDER_H = Math.round(CHAR_FRAME_H * CHAR_SCALE); // ~106 px
 
 // Foot-level collision box offset (centered at player shoes for natural RPG movement)
-const FEET_OFFSET_Y   = 38;
-const PLAYER_SPEED    = 7;
+const FEET_OFFSET_Y = Math.round(CHAR_RENDER_H / 2 - 8); // ~45 px
+const PLAYER_SPEED  = 7;
+
+// Animation timing
+const TOTAL_ANIM_FRAMES = 24;
+const RUN_FPS  = 18; // Fast timestamp delta tick for walking
+const IDLE_FPS = 9;  // Slower looping for breathing idle
+
+interface CharacterFrameSet {
+    idle: HTMLImageElement[];
+    run: HTMLImageElement[];
+    sit: {
+        down: HTMLImageElement;
+        up: HTMLImageElement;
+        left: HTMLImageElement;
+        right: HTMLImageElement;
+    };
+}
+
+async function loadCharacterFrames(charId: CharacterId): Promise<CharacterFrameSet> {
+    const idlePromises = Array.from({ length: TOTAL_ANIM_FRAMES }, (_, i) =>
+        loadImage(`/assets/character/single/${charId}_idle_anim_${i + 1}.png`)
+    );
+    const runPromises = Array.from({ length: TOTAL_ANIM_FRAMES }, (_, i) =>
+        loadImage(`/assets/character/single/${charId}_run_${i + 1}.png`)
+    );
+    const sitDownP  = loadImage(`/assets/character/single/${charId}_sit_down.png`);
+    const sitUpP    = loadImage(`/assets/character/single/${charId}_sit_up.png`);
+    const sitLeftP  = loadImage(`/assets/character/single/${charId}_sit_left.png`);
+    const sitRightP = loadImage(`/assets/character/single/${charId}_sit_right.png`);
+
+    const [idle, run, sitDown, sitUp, sitLeft, sitRight] = await Promise.all([
+        Promise.all(idlePromises),
+        Promise.all(runPromises),
+        sitDownP,
+        sitUpP,
+        sitLeftP,
+        sitRightP,
+    ]);
+
+    return {
+        idle,
+        run,
+        sit: {
+            down: sitDown,
+            up: sitUp,
+            left: sitLeft,
+            right: sitRight,
+        },
+    };
+}
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
 
@@ -262,38 +353,53 @@ function drawElement(
 
 function drawPlayer(
     ctx: CanvasRenderingContext2D,
-    sprites: Record<string, HTMLImageElement | undefined>,
+    charactersMap: Map<CharacterId, CharacterFrameSet>,
     sx: number,
     sy: number,
+    charId: CharacterId,
+    state: "idle" | "walking" | "sitting",
     dir: "down" | "left" | "right" | "up",
-    frame: number,
-    name: string,
+    currentFrame: number,
+    username: string,
     isLocal: boolean,
-    isSitting: boolean = false
+    chatMessage?: string
 ) {
-    const sheet = sprites[dir];
-    const dw = PLAYER_RENDER_W;
-    const dh = PLAYER_RENDER_H;
+    const charSet = charactersMap.get(charId) || charactersMap.get("Harry");
+    const dw = CHAR_RENDER_W;
+    const dh = CHAR_RENDER_H;
     const dx = sx - dw / 2;
     const dy = sy - dh / 2;
 
-    if (sheet) {
-        if (isSitting) {
-            // Spec 10: crop upper body only (sourceH = 42, destH = 126), hiding legs cleanly
-            ctx.drawImage(
-                sheet,
-                frame * SPRITE_FRAME_W, 0,
-                SPRITE_FRAME_W, 42,
-                dx, dy,
-                dw, 126
-            );
+    if (charSet) {
+        let frameImg: HTMLImageElement | undefined;
+        let needsMirror = false;
+
+        if (state === "sitting") {
+            // Sitting: stop frame increments, resolve exact static sitting sprite for direction
+            frameImg = charSet.sit[dir] || charSet.sit.down;
+        } else if (state === "walking") {
+            // Walking: 1 to 24 run frames
+            const frameIdx = Math.max(0, Math.min(TOTAL_ANIM_FRAMES - 1, currentFrame - 1));
+            frameImg = charSet.run[frameIdx] || charSet.run[0];
+            // Run animation natively faces right; mirror horizontally when moving left
+            needsMirror = dir === "left";
         } else {
-            ctx.drawImage(
-                sheet,
-                frame * SPRITE_FRAME_W, 0,
-                SPRITE_FRAME_W, SPRITE_FRAME_H,
-                dx, dy, dw, dh
-            );
+            // Idle: 1 to 24 idle anim frames
+            const frameIdx = Math.max(0, Math.min(TOTAL_ANIM_FRAMES - 1, currentFrame - 1));
+            frameImg = charSet.idle[frameIdx] || charSet.idle[0];
+            needsMirror = dir === "left";
+        }
+
+        if (frameImg) {
+            if (needsMirror) {
+                ctx.save();
+                ctx.translate(sx, sy);
+                ctx.scale(-1, 1);
+                ctx.drawImage(frameImg, -dw / 2, -dh / 2, dw, dh);
+                ctx.restore();
+            } else {
+                ctx.drawImage(frameImg, dx, dy, dw, dh);
+            }
         }
     } else {
         ctx.fillStyle = isLocal ? "#8b5cf6" : "#38bdf8";
@@ -302,23 +408,63 @@ function drawPlayer(
         ctx.fill();
     }
 
+    // Comic speech bubble if active chat message
+    let bubbleTopY = dy - 6;
+    if (chatMessage && chatMessage.trim()) {
+        ctx.save();
+        ctx.font = "bold 13px 'Inter', system-ui, sans-serif";
+        const msgText = chatMessage.trim();
+        const textW = ctx.measureText(msgText).width;
+        const bubbleW = Math.max(60, textW + 24);
+        const bubbleH = 28;
+        const bubbleX = sx - bubbleW / 2;
+        const bubbleY = dy - bubbleH - 12;
+        bubbleTopY = bubbleY - 4;
+
+        ctx.fillStyle = "#ffffff";
+        ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetY = 2;
+        ctx.beginPath();
+        ctx.roundRect(bubbleX, bubbleY, bubbleW, bubbleH, 8);
+        ctx.fill();
+
+        // Little speech pointer
+        ctx.beginPath();
+        ctx.moveTo(sx - 5, bubbleY + bubbleH);
+        ctx.lineTo(sx + 5, bubbleY + bubbleH);
+        ctx.lineTo(sx, bubbleY + bubbleH + 6);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+
+        ctx.fillStyle = "#0f172a";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(msgText, sx, bubbleY + bubbleH / 2);
+        ctx.restore();
+    }
+
     // Name tag above avatar head
     ctx.save();
-    ctx.font = "bold 14px 'Inter', system-ui, sans-serif";
+    ctx.font = "bold 13px 'Inter', system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
-    const tw = ctx.measureText(name).width;
-    const tagY = dy + 45;
+    const nameLabel = `${username || "Player"} • ${charId === "Hermoine" ? "Hermione" : charId}`;
+    const tw = ctx.measureText(nameLabel).width;
+    const tagY = Math.min(dy - 4, bubbleTopY);
     const px = 8;
-    const py = 5;
+    const py = 4;
 
-    ctx.fillStyle = "rgba(0, 0, 0, 0.68)";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.72)";
     ctx.beginPath();
-    ctx.roundRect(sx - tw / 2 - px, tagY - 16 - py, tw + px * 2, 16 + py * 2, 6);
+    ctx.roundRect(sx - tw / 2 - px, tagY - 15 - py, tw + px * 2, 15 + py * 2, 6);
     ctx.fill();
 
     ctx.fillStyle = isLocal ? "#c4b5fd" : "#7dd3fc";
-    ctx.fillText(name, sx, tagY);
+    ctx.fillText(nameLabel, sx, tagY);
     ctx.restore();
 }
 
@@ -361,33 +507,57 @@ export default function ArenaPage() {
     // ── Canvas ref ────────────────────────────────────────────────────────
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    // ── Mutable game state ────────────────────────────────────────────────
+    // ── Mutable game state & Extended State Matrix (specs/11-change-character.md) ──
     const defaultSpawn = initialScaledMap.spawnPoints[0] ?? { x: 1050, y: 900 };
     const initialDprRef     = useRef<number>(window.devicePixelRatio || 1);
     const keysRef           = useRef<Set<string>>(new Set());
-    const playerRef         = useRef<{
-        x: number;
-        y: number;
+
+    const [selectedCharacter, setSelectedCharacter] = useState<CharacterId>("Harry");
+    const [showCharacterPicker, setShowCharacterPicker] = useState<boolean>(true);
+    const [currentUsername, setCurrentUsername] = useState<string>(displayName);
+    const [chatInput, setChatInput] = useState<string>("");
+    const [activeChatMessage, setActiveChatMessage] = useState<string>("");
+    const chatTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const playerRef = useRef<{
+        name: CharacterId;
+        username: string;
+        state: "idle" | "walking" | "sitting";
         direction: "down" | "left" | "right" | "up";
-        frame: number;
+        currentFrame: number;
+        globalX: number;
+        globalY: number;
+        get x(): number;
+        set x(val: number);
+        get y(): number;
+        set y(val: number);
+        get frame(): number;
+        set frame(val: number);
     }>({
-        x: defaultSpawn.x,
-        y: defaultSpawn.y,
+        name: "Harry",
+        username: displayName,
+        state: "idle",
         direction: "down",
-        frame: 1, // Stopped standing pose (both feet planted)
+        currentFrame: 1,
+        globalX: defaultSpawn.x,
+        globalY: defaultSpawn.y,
+        get x() { return this.globalX; },
+        set x(val: number) { this.globalX = val; },
+        get y() { return this.globalY; },
+        set y(val: number) { this.globalY = val; },
+        get frame() { return this.currentFrame; },
+        set frame(val: number) { this.currentFrame = val; },
     });
+
     const cameraRef         = useRef({ x: 0, y: 0 });
     const remotePlayersRef  = useRef<Map<string, RemotePlayer>>(new Map());
     const lastFrameTimeRef  = useRef(0);
     const animAccRef        = useRef(0);
     const rafRef            = useRef<number>(0);
 
-    // ── Loaded assets ─────────────────────────────────────────────────────
+    // ── Loaded assets (multi-frame character sets cached) ─────────────────
     const assetsRef = useRef<{
-        spriteDown?:   HTMLImageElement;
-        spriteLeft?:   HTMLImageElement;
-        spriteRight?:  HTMLImageElement;
-        spriteUp?:     HTMLImageElement;
+        characters?:   Map<CharacterId, CharacterFrameSet>;
         floorTileset?: HTMLImageElement;
         tilesetImages?: Map<string, HTMLImageElement>;
         bgPattern?:    CanvasPattern | null;
@@ -395,36 +565,91 @@ export default function ArenaPage() {
 
     // ── Sitting state & WebSocket sync ────────────────────────────────────
     const [playerState, setPlayerState] = useState<PlayerState>("idle");
-    const playerStateRef = useRef<PlayerState>("idle");
     const seatedElementRef = useRef<MapElement | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
 
-    const broadcastPlayerState = useCallback(
-        (state: PlayerState, x: number, y: number, direction: "down" | "left" | "right" | "up") => {
-            const playerId = session?.user?.id || "user-" + (navState?.displayName || displayName || "player");
+    // ── Packet hook: onPlayerStateChange ──────────────────────────────────
+    const onPlayerStateChange = useCallback(
+        (player: {
+            name: CharacterId;
+            username: string;
+            state: "idle" | "walking" | "sitting";
+            direction: "down" | "left" | "right" | "up";
+            currentFrame: number;
+            globalX: number;
+            globalY: number;
+        }) => {
+            const playerId = session?.user?.id || "user-" + (player.username || "player");
             const payload = {
                 type: "player-state",
                 playerId,
-                state,
-                x,
-                y,
-                direction,
+                character: player.name,
+                username: player.username,
+                state: player.state,
+                direction: player.direction,
+                currentFrame: player.currentFrame,
+                globalX: player.globalX,
+                globalY: player.globalY,
+                x: player.globalX,
+                y: player.globalY,
             };
             if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                 wsRef.current.send(JSON.stringify(payload));
             }
         },
-        [session?.user?.id, navState?.displayName, displayName]
+        [session?.user?.id]
     );
 
-    // ── Backend sync stubs ────────────────────────────────────────────────
-    const onLocalPlayerMove = useCallback(
-        (x: number, y: number, dir: string, frame: number) => {
-            void x; void y; void dir; void frame;
-            // Stub: emit to WebSocket server
+    // Keep playerRef username updated when displayName/currentUsername changes
+    useEffect(() => {
+        playerRef.current.username = currentUsername;
+    }, [currentUsername]);
+
+    // Handle character switch from CharacterPicker UI
+    const handleSelectCharacter = useCallback(
+        (charId: CharacterId) => {
+            setSelectedCharacter(charId);
+            playerRef.current.name = charId;
+            setShowCharacterPicker(false);
+            onPlayerStateChange(playerRef.current);
         },
-        []
+        [onPlayerStateChange]
     );
+
+    // Handle chat submission
+    const handleSendMessage = useCallback(() => {
+        const trimmed = chatInput.trim();
+        if (!trimmed) return;
+
+        if (trimmed.startsWith("/name ")) {
+            const newName = trimmed.slice(6).trim();
+            if (newName) {
+                setCurrentUsername(newName);
+                playerRef.current.username = newName;
+                onPlayerStateChange(playerRef.current);
+            }
+        } else {
+            setActiveChatMessage(trimmed);
+            if (chatTimeoutRef.current) {
+                clearTimeout(chatTimeoutRef.current);
+            }
+            chatTimeoutRef.current = setTimeout(() => {
+                setActiveChatMessage("");
+            }, 5000);
+
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                wsRef.current.send(
+                    JSON.stringify({
+                        type: "chat-message",
+                        playerId: session?.user?.id || "user-" + (currentUsername || "player"),
+                        message: trimmed,
+                    })
+                );
+            }
+        }
+
+        setChatInput("");
+    }, [chatInput, currentUsername, onPlayerStateChange, session?.user?.id]);
 
     // ── Main game loop ────────────────────────────────────────────────────
     const gameLoopRef = useRef<((ts: number) => void) | null>(null);
@@ -455,16 +680,17 @@ export default function ArenaPage() {
         if (keys.has("arrowup")    || keys.has("keyw") || keys.has("w")) vy -= 1;
         if (keys.has("arrowdown")  || keys.has("keys") || keys.has("s")) vy += 1;
 
-        if (playerStateRef.current === "sitting") {
+        if (player.state === "sitting") {
             if (vx !== 0 || vy !== 0) {
-                // User pressed movement keys while seated: stand up and resume walking
-                playerStateRef.current = "walking";
+                // Movement key pressed while sitting: revert to idle/walking, unlock controls, offset slightly
+                player.state = "walking";
                 setPlayerState("walking");
                 seatedElementRef.current = null;
-                broadcastPlayerState("walking", player.x, player.y, player.direction);
+                player.globalX += vx * 12;
+                player.globalY += vy * 12;
+                onPlayerStateChange(player);
             } else {
-                // Movement disabled while sitting: lock frame to stable idle frame 1
-                player.frame = 1;
+                // Movement locked while sitting
                 vx = 0;
                 vy = 0;
             }
@@ -473,8 +699,8 @@ export default function ArenaPage() {
         let moved = false;
 
         if (vx !== 0 || vy !== 0) {
-            if (playerStateRef.current !== "walking") {
-                playerStateRef.current = "walking";
+            if (player.state !== "walking") {
+                player.state = "walking";
                 setPlayerState("walking");
             }
             if (vy > 0) player.direction = "down";
@@ -491,14 +717,14 @@ export default function ArenaPage() {
 
             const dx = vx * effectiveSpeed;
             const dy = vy * effectiveSpeed;
-            const curFootX = player.x;
-            const curFootY = player.y + FEET_OFFSET_Y;
+            const curFootX = player.globalX;
+            const curFootY = player.globalY + FEET_OFFSET_Y;
 
             // Test X axis independently with pixel-stepping on contact for smooth sliding
             if (dx !== 0) {
                 const targetFootX = curFootX + dx;
                 if (canMoveTo(targetFootX, curFootY, currentMap, collisionRects)) {
-                    player.x += dx;
+                    player.globalX += dx;
                     moved = true;
                 } else {
                     const step = Math.sign(dx);
@@ -508,7 +734,7 @@ export default function ArenaPage() {
                     while (advanced + 1 <= totalDist) {
                         if (canMoveTo(fx + step, curFootY, currentMap, collisionRects)) {
                             fx += step;
-                            player.x += step;
+                            player.globalX += step;
                             advanced += 1;
                             moved = true;
                         } else {
@@ -517,7 +743,7 @@ export default function ArenaPage() {
                     }
                     const rem = totalDist - advanced;
                     if (rem > 0 && canMoveTo(fx + step * rem, curFootY, currentMap, collisionRects)) {
-                        player.x += step * rem;
+                        player.globalX += step * rem;
                         moved = true;
                     }
                 }
@@ -525,10 +751,10 @@ export default function ArenaPage() {
 
             // Test Y axis independently with pixel-stepping on contact for smooth sliding
             if (dy !== 0) {
-                const updatedFootX = player.x;
+                const updatedFootX = player.globalX;
                 const targetFootY = curFootY + dy;
                 if (canMoveTo(updatedFootX, targetFootY, currentMap, collisionRects)) {
-                    player.y += dy;
+                    player.globalY += dy;
                     moved = true;
                 } else {
                     const step = Math.sign(dy);
@@ -538,7 +764,7 @@ export default function ArenaPage() {
                     while (advanced + 1 <= totalDist) {
                         if (canMoveTo(updatedFootX, fy + step, currentMap, collisionRects)) {
                             fy += step;
-                            player.y += step;
+                            player.globalY += step;
                             advanced += 1;
                             moved = true;
                         } else {
@@ -547,45 +773,51 @@ export default function ArenaPage() {
                     }
                     const rem = totalDist - advanced;
                     if (rem > 0 && canMoveTo(updatedFootX, fy + step * rem, currentMap, collisionRects)) {
-                        player.y += step * rem;
+                        player.globalY += step * rem;
                         moved = true;
                     }
                 }
             }
         }
 
-        // Animate sprite frames when moving; return to stopped standing frame (1) when idle
-        if (moved) {
+        // ── Animation Frame Updates (specs/11-change-character.md) ────────
+        if (player.state === "walking" && moved) {
             animAccRef.current += dt;
-            const mspf = 1000 / SPRITE_FPS;
+            const mspf = 1000 / RUN_FPS;
             if (animAccRef.current >= mspf) {
-                player.frame = (player.frame + 1) % SPRITE_FRAMES;
+                player.currentFrame = (player.currentFrame % TOTAL_ANIM_FRAMES) + 1;
                 animAccRef.current -= mspf;
-                onLocalPlayerMove(player.x, player.y, player.direction, player.frame);
+                onPlayerStateChange(player);
             }
-        } else {
-            if (player.frame !== 1) {
-                player.frame = 1;
-                onLocalPlayerMove(player.x, player.y, player.direction, 1);
-            }
-            animAccRef.current = 0;
-            if (playerStateRef.current === "walking") {
-                playerStateRef.current = "idle";
+        } else if (player.state === "idle" || (!moved && player.state === "walking")) {
+            if (player.state === "walking") {
+                player.state = "idle";
                 setPlayerState("idle");
             }
+            // Loop idle anim frames slowly
+            animAccRef.current += dt;
+            const mspf = 1000 / IDLE_FPS;
+            if (animAccRef.current >= mspf) {
+                player.currentFrame = (player.currentFrame % TOTAL_ANIM_FRAMES) + 1;
+                animAccRef.current -= mspf;
+            }
+        } else if (player.state === "sitting") {
+            // Stop frame increments completely
+            animAccRef.current = 0;
+            player.currentFrame = 1;
         }
 
         // ── Camera: center map if viewport is larger, follow player if smaller
         if (vw >= currentMap.width) {
             camera.x = -(vw - currentMap.width) / 2;
         } else {
-            camera.x = Math.max(0, Math.min(currentMap.width - vw, player.x - vw / 2));
+            camera.x = Math.max(0, Math.min(currentMap.width - vw, player.globalX - vw / 2));
         }
 
         if (vh >= currentMap.height) {
             camera.y = -(vh - currentMap.height) / 2;
         } else {
-            camera.y = Math.max(0, Math.min(currentMap.height - vh, player.y - vh / 2));
+            camera.y = Math.max(0, Math.min(currentMap.height - vh, player.globalY - vh / 2));
         }
 
         // ── Clear Canvas ──────────────────────────────────────────────────
@@ -620,20 +852,13 @@ export default function ArenaPage() {
             );
         }
 
-        // ── Check proximity to sittable objects (tables, sofas, chairs, computers) ──
-        const curFootX = player.x;
-        const curFootY = player.y + FEET_OFFSET_Y;
+        // ── Check proximity to sittable objects (tables, sofas, chairs) ───
+        const curFootX = player.globalX;
+        const curFootY = player.globalY + FEET_OFFSET_Y;
         const nearestSittable = findNearestSittable(curFootX, curFootY, currentMap.elements);
 
         // ── Render all physical entities (elements + players) sorted by Depth Y ──
-        if (currentMap.tilesets && assets.tilesetImages) {
-            const sprites: Record<string, HTMLImageElement | undefined> = {
-                down:  assets.spriteDown,
-                left:  assets.spriteLeft,
-                right: assets.spriteRight,
-                up:    assets.spriteUp,
-            };
-
+        if (currentMap.tilesets && assets.tilesetImages && assets.characters) {
             type RenderEntity =
                 | {
                       kind: "element";
@@ -648,11 +873,13 @@ export default function ArenaPage() {
                       player: {
                           sx: number;
                           sy: number;
+                          charId: CharacterId;
+                          state: "idle" | "walking" | "sitting";
                           direction: "down" | "left" | "right" | "up";
-                          frame: number;
-                          displayName: string;
+                          currentFrame: number;
+                          username: string;
                           isLocal: boolean;
-                          isSitting: boolean;
+                          chatMessage?: string;
                       };
                   };
 
@@ -681,40 +908,44 @@ export default function ArenaPage() {
                 const sy = rp.y - camera.y;
                 if (sx < -96 || sx > vw + 96 || sy < -96 || sy > vh + 96) return;
                 const isSitting = rp.state === "sitting";
+                const charId = (rp.character as CharacterId) || "Harry";
+                const st = (rp.state as "idle" | "walking" | "sitting") || (isSitting ? "sitting" : "idle");
                 entities.push({
                     kind: "player",
-                    depthY: isSitting ? rp.y : rp.y + FEET_OFFSET_Y,
+                    depthY: isSitting ? rp.y - 1 : rp.y + FEET_OFFSET_Y,
                     priority: 45,
                     player: {
                         sx,
                         sy,
-                        direction: rp.direction,
-                        frame: isSitting ? 1 : rp.frame,
-                        displayName: rp.displayName,
+                        charId,
+                        state: st,
+                        direction: rp.direction || "down",
+                        currentFrame: rp.frame || 1,
+                        username: rp.displayName || "Player",
                         isLocal: false,
-                        isSitting,
+                        chatMessage: rp.chatMessage,
                     },
                 });
             });
 
             // 3. Local player
-            const localSx = player.x - camera.x;
-            const localSy = player.y - camera.y;
-            const isLocalSitting = playerStateRef.current === "sitting";
+            const localSx = player.globalX - camera.x;
+            const localSy = player.globalY - camera.y;
+            const isLocalSitting = player.state === "sitting";
             const seatedChair = seatedElementRef.current;
+
             let localDepthY = curFootY;
             if (isLocalSitting && seatedChair) {
                 const chairH = seatedChair.height ?? 32;
-                const chairDir = seatedChair.properties?.find((p) => p.name === "direction")?.value;
-                if (chairDir === "up") {
-                    // Facing up: avatar renders behind the chair's backrest
-                    localDepthY = seatedChair.y + chairH - 1;
+                if (player.direction === "up") {
+                    // Back-of-head facing away: chair drawn slightly over player back
+                    localDepthY = seatedChair.y + chairH - 2;
                 } else {
-                    // Facing down / left / right: avatar renders in front of the chair backrest
+                    // Front / side facing: player sitting on top of chair
                     localDepthY = seatedChair.y + chairH + 1;
                 }
             } else if (isLocalSitting) {
-                localDepthY = player.y;
+                localDepthY = player.globalY;
             }
 
             entities.push({
@@ -724,11 +955,13 @@ export default function ArenaPage() {
                 player: {
                     sx: localSx,
                     sy: localSy,
+                    charId: player.name,
+                    state: player.state,
                     direction: player.direction,
-                    frame: isLocalSitting ? 1 : player.frame,
-                    displayName,
+                    currentFrame: player.currentFrame,
+                    username: currentUsername,
                     isLocal: true,
-                    isSitting: isLocalSitting,
+                    chatMessage: activeChatMessage,
                 },
             });
 
@@ -746,12 +979,24 @@ export default function ArenaPage() {
                     drawElement(ctx, entity.element, currentMap.tilesets, assets.tilesetImages, camera.x, camera.y, vw, vh);
                 } else {
                     const p = entity.player;
-                    drawPlayer(ctx, sprites, p.sx, p.sy, p.direction, p.frame, p.displayName, p.isLocal, p.isSitting);
+                    drawPlayer(
+                        ctx,
+                        assets.characters,
+                        p.sx,
+                        p.sy,
+                        p.charId,
+                        p.state,
+                        p.direction,
+                        p.currentFrame,
+                        p.username,
+                        p.isLocal,
+                        p.chatMessage
+                    );
                 }
             }
 
             // Floating sit prompt popup on canvas directly at the nearest table or chair
-            if (nearestSittable && playerStateRef.current !== "sitting") {
+            if (nearestSittable && player.state !== "sitting") {
                 ctx.save();
                 const promptText = "Press E to sit";
                 ctx.font = "bold 13px 'Inter', system-ui, sans-serif";
@@ -780,7 +1025,7 @@ export default function ArenaPage() {
                 ctx.roundRect(promptX, promptY, promptW, promptH, 8);
                 ctx.fill();
 
-                // Small indicator pointer arrow connecting label to element
+                // Indicator pointer arrow connecting label to element
                 ctx.beginPath();
                 if (isPlayerBelow) {
                     ctx.moveTo(arrowX - 5, promptY);
@@ -822,7 +1067,7 @@ export default function ArenaPage() {
                 ctx.font = "bold 12px 'Inter', system-ui, sans-serif";
                 ctx.textAlign = "left";
                 ctx.textBaseline = "middle";
-                ctx.fillText("Press E to sit", keyX + keySize + 6, promptY + promptH / 2);
+                ctx.fillText(promptText, keyX + keySize + 6, promptY + promptH / 2);
                 ctx.restore();
             }
         }
@@ -868,8 +1113,6 @@ export default function ArenaPage() {
             }
 
             // Draw player foot collision box in green
-            const curFootX = player.x;
-            const curFootY = player.y + FEET_OFFSET_Y;
             const footBoxSx = curFootX - 12 - camera.x;
             const footBoxSy = curFootY - 8 - camera.y;
             ctx.fillStyle = "rgba(34, 197, 94, 0.4)";
@@ -880,7 +1123,7 @@ export default function ArenaPage() {
         }
 
         rafRef.current = requestAnimationFrame((ts) => gameLoopRef.current?.(ts));
-    }, [displayName, onLocalPlayerMove, broadcastPlayerState]);
+    }, [currentUsername, activeChatMessage, onPlayerStateChange]);
 
     useEffect(() => {
         gameLoopRef.current = gameLoop;
@@ -899,7 +1142,7 @@ export default function ArenaPage() {
         return () => window.removeEventListener("resize", onResize);
     }, []);
 
-    // ── Load map JSON & assets, start game loop ───────────────────────────
+    // ── Load map JSON & assets, pre-cache character frames, start loop ────
     useEffect(() => {
         let cancelled = false;
 
@@ -922,12 +1165,17 @@ export default function ArenaPage() {
                 const rects = buildCollisionRectangles(scaled);
                 collisionRectsRef.current = rects;
 
-                // Load player sprites, base floor, background pattern, and all declared tilesets
-                const [down, left, right, up, floor, bg] = await Promise.all([
-                    loadImage("/assets/avtar/Down/[TD] Character 0 Down Spritesheet.png"),
-                    loadImage("/assets/avtar/Left/[TD] Character 0 Left Spritesheet.png"),
-                    loadImage("/assets/avtar/Right/[TD] Character 0 Right Spritesheet.png"),
-                    loadImage("/assets/avtar/Up/[TD] Character 0 Up Spritesheet.png"),
+                // Pre-cache all 24 idle, 24 run, and 4 sit frames for all 4 characters
+                const charMap = new Map<CharacterId, CharacterFrameSet>();
+                await Promise.all(
+                    CHARACTER_OPTIONS.map(async (charOpt) => {
+                        const set = await loadCharacterFrames(charOpt.id);
+                        charMap.set(charOpt.id, set);
+                    })
+                );
+
+                // Load base floor, background pattern, and all declared tilesets
+                const [floor, bg] = await Promise.all([
                     loadImage(scaled.floor.image),
                     loadImage("/assets/background/bg.png"),
                 ]);
@@ -955,10 +1203,7 @@ export default function ArenaPage() {
                 const pat    = ctx.createPattern(bg, "repeat");
 
                 assetsRef.current = {
-                    spriteDown:   down,
-                    spriteLeft:   left,
-                    spriteRight:  right,
-                    spriteUp:     up,
+                    characters:   charMap,
                     floorTileset: floor,
                     tilesetImages,
                     bgPattern:    pat,
@@ -976,8 +1221,8 @@ export default function ArenaPage() {
                     attempts++;
                 }
 
-                playerRef.current.x = spawnX;
-                playerRef.current.y = spawnY;
+                playerRef.current.globalX = spawnX;
+                playerRef.current.globalY = spawnY;
 
                 lastFrameTimeRef.current = performance.now();
                 rafRef.current = requestAnimationFrame(gameLoop);
@@ -994,12 +1239,23 @@ export default function ArenaPage() {
         return () => {
             cancelled = true;
             cancelAnimationFrame(rafRef.current);
+            if (chatTimeoutRef.current) {
+                clearTimeout(chatTimeoutRef.current);
+            }
         };
     }, [gameLoop]);
 
     // ── Keyboard events ───────────────────────────────────────────────────
     useEffect(() => {
         const onDown = (e: KeyboardEvent) => {
+            // Exclude keystrokes when typing inside chat or other input elements
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+                if (e.key === "Enter") {
+                    handleSendMessage();
+                }
+                return;
+            }
+
             const keyLower = e.key.toLowerCase();
             const codeLower = e.code.toLowerCase();
 
@@ -1011,32 +1267,38 @@ export default function ArenaPage() {
                 e.preventDefault();
             }
 
-            // Toggle collision debug mode with 'C' key (Requirement 10)
+            // Toggle collision debug mode with 'C' key
             if (keyLower === "c" && !e.ctrlKey && !e.metaKey && !e.altKey) {
                 setDebugMode((prev) => !prev);
             }
 
             // Sit on / stand up from nearest sittable element with 'E' key
             if ((keyLower === "e" || codeLower === "keye") && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                if (playerStateRef.current === "sitting") {
-                    playerStateRef.current = "walking";
-                    setPlayerState("walking");
+                if (playerRef.current.state === "sitting") {
+                    playerRef.current.state = "idle";
+                    setPlayerState("idle");
+                    // Offset slightly out of chair in direction they were facing
+                    const dir = playerRef.current.direction;
+                    if (dir === "down") playerRef.current.globalY += 24;
+                    else if (dir === "up") playerRef.current.globalY -= 24;
+                    else if (dir === "left") playerRef.current.globalX -= 24;
+                    else if (dir === "right") playerRef.current.globalX += 24;
                     seatedElementRef.current = null;
-                    broadcastPlayerState("walking", playerRef.current.x, playerRef.current.y, playerRef.current.direction);
+                    onPlayerStateChange(playerRef.current);
                 } else {
-                    const footX = playerRef.current.x;
-                    const footY = playerRef.current.y + FEET_OFFSET_Y;
+                    const footX = playerRef.current.globalX;
+                    const footY = playerRef.current.globalY + FEET_OFFSET_Y;
                     const nearest = findNearestSittable(footX, footY, mapRef.current.elements);
                     if (nearest) {
                         const sit = getElementSitPoint(nearest, footX, footY);
-                        playerRef.current.x = sit.x;
-                        playerRef.current.y = sit.y;
+                        playerRef.current.globalX = sit.x;
+                        playerRef.current.globalY = sit.y;
                         playerRef.current.direction = sit.direction;
-                        playerRef.current.frame = 1;
+                        playerRef.current.state = "sitting";
+                        playerRef.current.currentFrame = 1;
                         seatedElementRef.current = nearest;
-                        playerStateRef.current = "sitting";
                         setPlayerState("sitting");
-                        broadcastPlayerState("sitting", sit.x, sit.y, sit.direction);
+                        onPlayerStateChange(playerRef.current);
                     }
                 }
             }
@@ -1046,6 +1308,9 @@ export default function ArenaPage() {
         };
 
         const onUp = (e: KeyboardEvent) => {
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+                return;
+            }
             const keyLower = e.key.toLowerCase();
             const codeLower = e.code.toLowerCase();
             keysRef.current.delete(keyLower);
@@ -1065,7 +1330,9 @@ export default function ArenaPage() {
             window.removeEventListener("keyup",   onUp);
             window.removeEventListener("blur",    onBlur);
         };
-    }, [broadcastPlayerState]);
+    }, [handleSendMessage, onPlayerStateChange]);
+
+    const activeCharOption = CHARACTER_OPTIONS.find((c) => c.id === selectedCharacter) || CHARACTER_OPTIONS[0];
 
     // ── Render ────────────────────────────────────────────────────────────
     return (
@@ -1111,10 +1378,9 @@ export default function ArenaPage() {
                 >
                     ALTERVERSE
                 </div>
-                
             </div>
 
-            {/* ── Prominent HUD: top-right (Collision debug toggle, Player badge & Leave button) ─── */}
+            {/* ── Prominent HUD: top-right (Character Selector, Collision debug toggle, Player badge & Leave button) ─── */}
             <div
                 style={{
                     position: "absolute",
@@ -1125,6 +1391,30 @@ export default function ArenaPage() {
                     gap: 10,
                 }}
             >
+                {/* Character Picker trigger button */}
+                <button
+                    onClick={() => setShowCharacterPicker(true)}
+                    title="Change character skin"
+                    style={{
+                        padding: "7px 14px",
+                        borderRadius: 10,
+                        background: "rgba(9, 7, 24, 0.76)",
+                        border: "1px solid rgba(196, 181, 253, 0.3)",
+                        backdropFilter: "blur(12px)",
+                        fontSize: 13,
+                        color: "#c4b5fd",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        transition: "all 0.15s ease",
+                    }}
+                >
+                    <Sparkles size={14} />
+                    <span>Character: <strong style={{ color: "#ffffff" }}>{activeCharOption.label}</strong></span>
+                </button>
+
                 {/* Collision & element debug toggle button */}
                 <button
                     onClick={() => setDebugMode((prev) => !prev)}
@@ -1159,6 +1449,7 @@ export default function ArenaPage() {
                     <span>[C] Debug: {debugMode ? "ON" : "OFF"}</span>
                 </button>
 
+                {/* Player badge */}
                 <div
                     style={{
                         padding: "7px 16px",
@@ -1184,9 +1475,10 @@ export default function ArenaPage() {
                             boxShadow: "0 0 8px #34d399",
                         }}
                     />
-                    <span style={{ fontWeight: 600 }}>{displayName}</span>
+                    <span style={{ fontWeight: 600 }}>{currentUsername}</span>
                 </div>
 
+                {/* Leave button */}
                 <button
                     onClick={() => navigate(-1)}
                     style={{
@@ -1226,6 +1518,298 @@ export default function ArenaPage() {
             >
                 {playerState === "sitting" ? "[WASD / E] Stand up" : "WASD to move • [E] Sit"}
             </div>
+
+            {/* ── Chat HUD Integration (specs/11-change-character.md) ─── */}
+            <div
+                style={{
+                    position: "absolute",
+                    bottom: 18,
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: "rgba(15, 23, 42, 0.85)",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
+                    backdropFilter: "blur(12px)",
+                    borderRadius: 12,
+                    padding: "6px 10px 6px 14px",
+                    width: "min(520px, calc(100vw - 320px))",
+                    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+                    zIndex: 20,
+                }}
+            >
+                <MessageSquare size={16} color="#94a3b8" />
+                <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Type speech bubble or /name <newName>..."
+                    style={{
+                        flex: 1,
+                        background: "transparent",
+                        border: "none",
+                        outline: "none",
+                        color: "#f8fafc",
+                        fontSize: 13,
+                        fontFamily: "'Inter', system-ui, sans-serif",
+                    }}
+                />
+                <button
+                    onClick={handleSendMessage}
+                    style={{
+                        padding: "6px 12px",
+                        borderRadius: 8,
+                        background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                        border: "none",
+                        color: "#ffffff",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                    }}
+                >
+                    <span>Send</span>
+                    <Send size={12} />
+                </button>
+            </div>
+
+            {/* ── Character Picker UI Overlay (specs/11-change-character.md) ─── */}
+            {showCharacterPicker && (
+                <div
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        background: "rgba(9, 7, 24, 0.8)",
+                        backdropFilter: "blur(16px)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 100,
+                        padding: 24,
+                    }}
+                >
+                    <div
+                        style={{
+                            background: "linear-gradient(180deg, #18152e 0%, #0f0d1f 100%)",
+                            border: "1px solid rgba(168, 85, 247, 0.35)",
+                            borderRadius: 20,
+                            padding: 32,
+                            width: "min(880px, 100%)",
+                            boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 40px rgba(168, 85, 247, 0.15)",
+                            position: "relative",
+                        }}
+                    >
+                        {/* Close button */}
+                        <button
+                            onClick={() => setShowCharacterPicker(false)}
+                            style={{
+                                position: "absolute",
+                                top: 20,
+                                right: 20,
+                                background: "rgba(255, 255, 255, 0.06)",
+                                border: "1px solid rgba(255, 255, 255, 0.1)",
+                                borderRadius: 8,
+                                padding: 6,
+                                color: "#94a3b8",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
+                        >
+                            <X size={18} />
+                        </button>
+
+                        {/* Header */}
+                        <div style={{ textAlign: "center", marginBottom: 28 }}>
+                            <div
+                                style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    padding: "4px 12px",
+                                    borderRadius: 999,
+                                    background: "rgba(168, 85, 247, 0.15)",
+                                    border: "1px solid rgba(168, 85, 247, 0.3)",
+                                    fontSize: 12,
+                                    color: "#d8b4fe",
+                                    fontWeight: 600,
+                                    marginBottom: 10,
+                                }}
+                            >
+                                <Sparkles size={13} />
+                                <span>CHARACTER SELECTION</span>
+                            </div>
+                            <h2
+                                style={{
+                                    fontSize: 26,
+                                    fontWeight: 700,
+                                    color: "#f8fafc",
+                                    margin: "0 0 6px 0",
+                                    letterSpacing: "-0.02em",
+                                }}
+                            >
+                                Choose Your Character
+                            </h2>
+                            <p style={{ fontSize: 14, color: "#94a3b8", margin: 0 }}>
+                                Select an avatar with 24-frame walking, breathing idle, and 4-way sitting
+                            </p>
+                        </div>
+
+                        {/* 4 Preview Cards */}
+                        <div
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                                gap: 16,
+                                marginBottom: 24,
+                            }}
+                        >
+                            {CHARACTER_OPTIONS.map((char) => {
+                                const isSelected = selectedCharacter === char.id;
+                                return (
+                                    <div
+                                        key={char.id}
+                                        onClick={() => handleSelectCharacter(char.id)}
+                                        style={{
+                                            background: isSelected
+                                                ? "linear-gradient(180deg, rgba(168, 85, 247, 0.22) 0%, rgba(126, 34, 206, 0.15) 100%)"
+                                                : "rgba(255, 255, 255, 0.03)",
+                                            border: isSelected
+                                                ? "2px solid #a855f7"
+                                                : "1px solid rgba(255, 255, 255, 0.08)",
+                                            borderRadius: 16,
+                                            padding: 20,
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            alignItems: "center",
+                                            cursor: "pointer",
+                                            transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                                            boxShadow: isSelected
+                                                ? "0 0 25px rgba(168, 85, 247, 0.35)"
+                                                : "none",
+                                            position: "relative",
+                                        }}
+                                    >
+                                        {isSelected && (
+                                            <div
+                                                style={{
+                                                    position: "absolute",
+                                                    top: 10,
+                                                    right: 10,
+                                                    width: 22,
+                                                    height: 22,
+                                                    borderRadius: "50%",
+                                                    background: "#a855f7",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    color: "#ffffff",
+                                                }}
+                                            >
+                                                <Check size={14} />
+                                            </div>
+                                        )}
+
+                                        {/* Avatar Preview Box */}
+                                        <div
+                                            style={{
+                                                width: 80,
+                                                height: 110,
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                background: "rgba(0, 0, 0, 0.3)",
+                                                borderRadius: 12,
+                                                marginBottom: 14,
+                                                border: "1px solid rgba(255, 255, 255, 0.05)",
+                                            }}
+                                        >
+                                            <img
+                                                src={char.preview}
+                                                alt={char.fullName}
+                                                style={{
+                                                    width: 64,
+                                                    height: 96,
+                                                    objectFit: "contain",
+                                                    imageRendering: "pixelated",
+                                                }}
+                                            />
+                                        </div>
+
+                                        <div style={{ textAlign: "center" }}>
+                                            <div
+                                                style={{
+                                                    fontSize: 16,
+                                                    fontWeight: 700,
+                                                    color: "#f8fafc",
+                                                    marginBottom: 3,
+                                                }}
+                                            >
+                                                {char.label}
+                                            </div>
+                                            <div
+                                                style={{
+                                                    fontSize: 11,
+                                                    color: "#c4b5fd",
+                                                    fontFamily: "monospace",
+                                                    textTransform: "uppercase",
+                                                    marginBottom: 6,
+                                                }}
+                                            >
+                                                {char.house}
+                                            </div>
+                                            <div
+                                                style={{
+                                                    fontSize: 12,
+                                                    color: "#94a3b8",
+                                                    lineHeight: 1.3,
+                                                }}
+                                            >
+                                                {char.description}
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleSelectCharacter(char.id);
+                                            }}
+                                            style={{
+                                                marginTop: 14,
+                                                width: "100%",
+                                                padding: "7px 0",
+                                                borderRadius: 8,
+                                                background: isSelected
+                                                    ? "#a855f7"
+                                                    : "rgba(255, 255, 255, 0.08)",
+                                                border: "none",
+                                                color: "#ffffff",
+                                                fontSize: 12,
+                                                fontWeight: 600,
+                                                cursor: "pointer",
+                                                transition: "background 0.15s ease",
+                                            }}
+                                        >
+                                            {isSelected ? "Selected" : "Select"}
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Footer prompt */}
+                        <div style={{ textAlign: "center" }}>
+                            <span style={{ fontSize: 13, color: "#64748b" }}>
+                                You can change characters anytime via the Character button in the top bar.
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
