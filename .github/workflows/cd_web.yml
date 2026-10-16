@@ -1,0 +1,62 @@
+name: Deploy the frontend
+on:
+    push:
+        branches: [ main ]
+        # Only trigger if files in these folders change
+        paths:
+            - 'apps/web/**'
+            - 'docker/web/Dockerfile'
+            - 'docker-compose.yml'
+jobs:
+    build:
+        runs-on: ubuntu-latest # github will use this machine
+        steps:
+            - name: Checkout the code
+              uses: actions/checkout@v2
+              
+            - name: Docker login
+              uses: docker/login-action@v2
+              with:
+                username: ${{ secrets.DOCKERHUB_USERNAME }}
+                password: ${{ secrets.DOCKERHUB_TOKEN }}
+            
+            # build image using "web/Dockerfile" on github machine, then push on dockerhub
+            - name: Build and push
+              uses: docker/build-push-action@v4
+              with:
+                context: .
+                file: ./docker/web/Dockerfile
+                push: true
+                tags: |
+                  amnkarn/alterverse-web:${{github.sha}}
+                  amnkarn/alterverse-web:latest
+
+            # ssh into ec2 machine(using github machine) and deploy
+            - name: SSH into machine and deploy
+              # make new dir '.ssh' in gh machine, and saves "EC2_SECRET_KEY" as "aman.pem"
+              # gives the key permision 
+              # git pull is just used for updating the docker compose file. there is no need of source files
+
+              # login dockerhub
+              # go to docker-compose, find "frontend service" and pull that frontend image from the dockerhub
+              # remove old and start new frontend
+              # remove trash images
+              env:
+                DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+                DOCKER_PASS: ${{ secrets.DOCKERHUB_TOKEN }}
+              run: |
+                mkdir -p ~/.ssh
+                echo "${{ secrets.EC2_SECRET_KEY }}" > ~/.ssh/aman.pem
+                chmod 600 ~/.ssh/aman.pem
+
+                ssh -i ~/.ssh/aman.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
+                  cd projects/alterverse
+
+                  git pull origin main 
+
+                  echo "${{ secrets.DOCKERHUB_TOKEN }}" | sudo docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+                  sudo docker compose pull frontend
+                  sudo docker compose up -d --remove-orphans frontend
+                  sudo docker image prune -f
+                EOF

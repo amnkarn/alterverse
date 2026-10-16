@@ -1,0 +1,66 @@
+name: Deploy the backend
+on:
+    push:
+        branches: [ main ]
+        # Only trigger if files in these folders change
+        paths:
+            - 'apps/backend/**'
+            - 'docker/backend/Dockerfile'
+            - 'docker-compose.yml'
+jobs:
+    build:
+        runs-on: ubuntu-latest # github will use this machine
+        steps:
+            # download all codes of backend, frontend, dockerifles, etc
+            - name: checkout the code
+              uses: actions/checkout@v3
+
+            # login into docker hub
+            - name: Docker login
+              uses: docker/login-action@v2
+              with:
+                username: ${{ secrets.DOCKERHUB_USERNAME }}
+                password: ${{ secrets.DOCKERHUB_TOKEN }}
+            
+            # build image using "backend/Dockerfile" on github machine, then push on dockerhub
+            - name: Build and push
+              uses: docker/build-push-action@v4
+              with:
+                context: .
+                file: ./docker/backend/Dockerfile
+                push: true
+                # give the tag "amnkarn/portfolio-api:latest", so we can run in docker compose
+                tags: |
+                  amnkarn/alterverse-backend:${{ github.sha }}
+                  amnkarn/alterverse-backend:latest
+
+            # ssh into ec2 machine(using github machine) and deploy
+            - name: SSH into machine and deploy
+              # first make new dir /.ssh in gh machine, saves "EC2_SECRET_KEY" as "aman.pem"
+              # "base64  -d" decodes that
+              # "chmod 600" gives the security permison
+              # then ssh into aws ec2 machine, "EOF" means runs that commands into the ec2 machine
+              # git pull is just used for updating the docker compose file. there is no need of source files
+
+              # login dockerhub
+              # go to docker-compose, find "backend service" and pull that backend image from the dockerhub
+              # remove old trash and start new backend
+              env:
+                DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+                DOCKER_PASS: ${{ secrets.DOCKERHUB_TOKEN }}
+              run: |
+                mkdir -p ~/.ssh
+                echo "${{ secrets.EC2_SECRET_KEY }}" > ~/.ssh/aman.pem
+                chmod 600 ~/.ssh/aman.pem
+
+                ssh -i ~/.ssh/aman.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
+                  cd projects/alterverse
+
+                  git pull origin main
+
+                  echo "${{ secrets.DOCKERHUB_TOKEN }}" | sudo docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+                  sudo docker compose pull backend
+                  sudo docker compose up -d --remove-orphans backend
+                  sudo docker image prune -f
+                EOF
