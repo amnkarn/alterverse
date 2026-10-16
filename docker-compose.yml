@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: docker/web/Dockerfile
     
-    image: alterverse-web:latest
+    image: amnkarn/alterverse-web:latest
     
     container_name: alterverse-web
     
@@ -24,7 +24,7 @@ services:
       context: .
       dockerfile: docker/backend/Dockerfile
     
-    image: alterverse-backend:latest
+    image: amnkarn/alterverse-backend:latest
     
     container_name: alterverse-backend
     
@@ -46,7 +46,7 @@ services:
       context: .
       dockerfile: docker/ws/Dockerfile
     
-    image: alterverse-ws:latest
+    image: amnkarn/alterverse-ws:latest
     
     container_name: alterverse-ws
     

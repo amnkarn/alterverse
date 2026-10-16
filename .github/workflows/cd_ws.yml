@@ -57,6 +57,6 @@ jobs:
                   echo "${{ secrets.DOCKERHUB_TOKEN }}" | sudo docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
                   sudo docker compose pull websocket
-                  sudo docker compose up -d --remove-orphans websocket
+                  sudo docker compose up -d --no-build --remove-orphans websocket
                   sudo docker image prune -f
                 EOF

@@ -61,6 +61,6 @@ jobs:
                   echo "${{ secrets.DOCKERHUB_TOKEN }}" | sudo docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
                   sudo docker compose pull backend
-                  sudo docker compose up -d --remove-orphans backend
+                  sudo docker compose up -d --no-build --remove-orphans backend
                   sudo docker image prune -f
                 EOF

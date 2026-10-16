@@ -57,6 +57,6 @@ jobs:
                   echo "${{ secrets.DOCKERHUB_TOKEN }}" | sudo docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
                   sudo docker compose pull frontend
-                  sudo docker compose up -d --remove-orphans frontend
+                  sudo docker compose up -d --no-build --remove-orphans frontend
                   sudo docker image prune -f
                 EOF
