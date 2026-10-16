@@ -1,0 +1,60 @@
+services:
+  frontend:
+    # build the image
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+    
+    image: alterverse-web:latest
+    
+    container_name: alterverse-web
+    
+    restart: always
+    
+    depends_on:
+      - backend
+      - websocket
+    
+    ports:
+      - "5173:5173"
+
+  backend:
+    # build the image
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    
+    image: alterverse-backend:latest
+    
+    container_name: alterverse-backend
+    
+    restart: always
+    
+    env_file: ./.env
+    
+    environment:
+      - PORT=8080
+    
+    ports:
+      - "8080:8080"
+    
+    command: sh -c "bun run db:push && bun run start:backend"
+
+  websocket:
+    # build the image
+    build:
+      context: .
+      dockerfile: docker/ws/Dockerfile
+    
+    image: alterverse-ws:latest
+    
+    container_name: alterverse-ws
+    
+    restart: always
+    
+    env_file: ./.env
+    
+    ports:
+      - "3001:3001"
+    
+    command: sh -c "bun run start:ws"
