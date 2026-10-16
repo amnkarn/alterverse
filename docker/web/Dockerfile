@@ -5,16 +5,12 @@ WORKDIR /app
 # Copy all package and lockfiles
 COPY package.json bun.lock ./
 COPY turbo.json ./
-COPY packages/db/package.json ./packages/db/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY apps/web/package.json ./apps/web/
 
 RUN bun install
 
 COPY . .
-
-# generate db client
-RUN bun db:generate
 
 # build the backend(root script)
 RUN bun run build:web

@@ -16,9 +16,6 @@ COPY . .
 # generate db client
 RUN bun db:generate
 
-# build the backend(root script)
-RUN bun run build:backend
-
 EXPOSE 8080
 
 # root script, start app/backend
