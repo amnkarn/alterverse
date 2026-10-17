@@ -39,6 +39,9 @@ jobs:
                 cache-from: type=gha
                 cache-to: type=gha,mode=max
 
+            - name: Wait for Docker Hub Sync
+              run: sleep 20
+
             # ssh into ec2 machine(using github machine) and deploy
             - name: SSH into machine and deploy
               # make new dir '.ssh' in gh machine, and saves "EC2_SECRET_KEY" as "aman.pem"
@@ -66,5 +69,4 @@ jobs:
 
                   sudo docker compose pull frontend
                   sudo docker compose up -d --no-build --remove-orphans frontend
-                  sleep 10 && sudo docker image prune -f
                 EOF
