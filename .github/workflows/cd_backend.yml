@@ -33,6 +33,9 @@ jobs:
                 tags: |
                   amnkarn/alterverse-backend:${{ github.sha }}
                   amnkarn/alterverse-backend:latest
+                # [SPEED BOOST FIX]: store cache in github machine RAM
+                cache-from: type=gha
+                cache-to: type=gha,mode=max
 
             # ssh into ec2 machine(using github machine) and deploy
             - name: SSH into machine and deploy
