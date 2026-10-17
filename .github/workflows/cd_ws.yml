@@ -1,4 +1,4 @@
-name: Deploy the frontend
+name: Deploy the websocket
 on:
     push:
         branches: [ main ]
@@ -27,6 +27,7 @@ jobs:
                 context: .
                 file: ./docker/ws/Dockerfile
                 push: true
+                # give the tag "amnkarn/alterverse-ws:latest", so we can run in docker compose
                 tags: |
                   amnkarn/alterverse-ws:${{github.sha}}
                   amnkarn/alterverse-ws:latest
@@ -38,8 +39,8 @@ jobs:
               # git pull is just used for updating the docker compose file. there is no need of source files
 
               # login dockerhub
-              # go to docker-compose, find "frontend service" and pull that frontend image from the dockerhub
-              # remove old and start new frontend
+              # go to docker-compose, find "websocket service" and pull that frontend image from the dockerhub
+              # remove old and start new websocket
               # remove trash images
               env:
                 DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}

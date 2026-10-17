@@ -27,6 +27,7 @@ jobs:
                 context: .
                 file: ./docker/web/Dockerfile
                 push: true
+                # give the tag "amnkarn/alterverse-web:latest", so we can run in docker compose
                 tags: |
                   amnkarn/alterverse-web:${{github.sha}}
                   amnkarn/alterverse-web:latest
