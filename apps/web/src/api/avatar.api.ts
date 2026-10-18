@@ -1,5 +1,7 @@
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
+import { getBackendUrl } from "../lib/auth-client";
+
+const BACKEND_URL = getBackendUrl();
 
 export interface AvtarItem {
     id: string;

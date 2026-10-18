@@ -8,8 +8,10 @@ export const auth = betterAuth({
         provider: "postgresql",
     }),
     trustedOrigins: [
-        "http://localhost:5173"
-    ],
+        "http://localhost:5173",
+        process.env.BETTER_AUTH_URL || "",
+        "https://alterverse.amnkarn.com"
+    ].filter(Boolean),
     emailAndPassword: {
         enabled: true,
     },

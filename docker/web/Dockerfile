@@ -16,6 +16,8 @@ COPY . .
 # Accept secret from GitHub
 ARG VITE_BACKEND_URL
 ENV VITE_BACKEND_URL=$VITE_BACKEND_URL
+ARG VITE_WS_URL
+ENV VITE_WS_URL=$VITE_WS_URL
 
 # build the backend(root script)
 RUN bun run build:web

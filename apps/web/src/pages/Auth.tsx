@@ -419,7 +419,7 @@ export default function AuthPage({ signInContent = {}, signUpContent = {} }: Aut
                 provider: "github",
                 // The OAuth callback is handled by the backend, but the final
                 // redirect must return the user to the frontend.
-                callbackURL: "http://localhost:5173/app"
+                callbackURL: typeof window !== "undefined" ? `${window.location.origin}/app` : "/app"
             })
         } catch (error) {
             console.log(error);

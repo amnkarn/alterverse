@@ -6,8 +6,14 @@ import { auth } from "./auth.js";
 import { toNodeHandler } from "better-auth/node";
 
 const app: Application = express();
+const allowedOrigins = [
+    "http://localhost:5173",
+    process.env.BETTER_AUTH_URL || "",
+    "https://alterverse.amnkarn.com"
+].filter(Boolean);
+
 app.use(cors({
-    origin: "http://localhost:5173",
+    origin: allowedOrigins,
     credentials: true
 }));
 app.use(morgan('dev'));

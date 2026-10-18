@@ -587,7 +587,11 @@ export default function ArenaPage() {
     const localPlayerIdRef = useRef<string | null>(null);
 
     useEffect(() => {
-        const wsUrl = "ws://localhost:3001";
+        const wsUrl = import.meta.env.VITE_WS_URL || (
+            typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
+                ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`
+                : "ws://localhost:3001"
+        );
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
