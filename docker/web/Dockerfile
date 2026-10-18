@@ -12,6 +12,11 @@ RUN bun install
 
 COPY . .
 
+# because vite need env file on build time
+# Accept secret from GitHub
+ARG VITE_BACKEND_URL
+ENV VITE_BACKEND_URL=$VITE_BACKEND_URL
+
 # build the backend(root script)
 RUN bun run build:web
 

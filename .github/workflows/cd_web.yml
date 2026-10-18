@@ -35,6 +35,9 @@ jobs:
                 tags: |
                   amnkarn/alterverse-web:${{github.sha}}
                   amnkarn/alterverse-web:latest
+                # because vite needs env on build time(building on github)
+                build-args: |
+                  VITE_BACKEND_URL=${{ secrets.VITE_BACKEND_URL }}
                 # [SPEED BOOST FIX]: store cache in github machine RAM
                 cache-from: type=gha
                 cache-to: type=gha,mode=max
