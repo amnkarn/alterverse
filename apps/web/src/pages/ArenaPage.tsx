@@ -587,16 +587,33 @@ export default function ArenaPage() {
     const localPlayerIdRef = useRef<string | null>(null);
 
     useEffect(() => {
-        const wsUrl = import.meta.env.VITE_WS_URL || (
-            typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
-                ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`
-                : "ws://localhost:3001"
-        );
+        const getWsUrl = (): string => {
+            const raw = import.meta.env.VITE_WS_URL;
+            if (raw && typeof raw === "string" && raw.trim().length > 0) {
+                let clean = raw.trim().replace(/\/+$/, "");
+                // If it is a domain without port and without /ws, ensure /ws is attached
+                if (!clean.includes("localhost") && !clean.includes(":3001") && !clean.endsWith("/ws")) {
+                    clean = `${clean}/ws`;
+                }
+                return clean;
+            }
+            if (typeof window !== "undefined") {
+                if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+                    return "ws://localhost:3001";
+                }
+                const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+                return `${proto}//${window.location.host}/ws`;
+            }
+            return "ws://localhost:3001";
+        };
+
+        const wsUrl = getWsUrl();
+        console.log("Connecting to WebSocket URL:", wsUrl);
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
         ws.onopen = () => {
-            console.log("Connected to websocket server", { spaceId: currentSpaceId });
+            console.log("Connected to websocket server", { spaceId: currentSpaceId, wsUrl });
             ws.send(JSON.stringify({
                 type: "join",
                 payload: {
@@ -604,6 +621,7 @@ export default function ArenaPage() {
                     displayName,
                     avatarId: navState?.avatarId || navState?.avatar?.id,
                     character: initialCharacter,
+                    userId: session?.user?.id,
                 },
             }));
         };
@@ -664,7 +682,8 @@ export default function ArenaPage() {
             console.error("WebSocket error:", event);
         };
 
-        ws.onclose = () => {
+        ws.onclose = (event) => {
+            console.log("WebSocket connection closed", { code: event.code, reason: event.reason, wasClean: event.wasClean });
             if (wsRef.current === ws) wsRef.current = null;
         };
 

@@ -19,6 +19,7 @@ type JoinPayload = {
   displayName?: string;
   avatarId?: string;
   character?: string;
+  userId?: string;
 };
 
 export class User {
@@ -36,7 +37,14 @@ export class User {
 
   private async join(payload: JoinPayload) {
     if (this.player) return;
-    if (!this.authenticatedUser) return;
+
+    if (!this.authenticatedUser) {
+      const authenticatedUser = await this.authenticatedUserPromise;
+      if (authenticatedUser) this.authenticatedUser = authenticatedUser;
+    }
+
+    const userId = this.authenticatedUser?.id || payload.userId || `user-${this.id.slice(0, 8)}`;
+    const displayName = payload.displayName?.trim() || this.authenticatedUser?.name || "Player";
 
     const spaceId = payload.spaceId ?? DEMO_SPACE_ID;
     let width = DEMO_MAP_WIDTH;
@@ -66,9 +74,9 @@ export class User {
 
     const player: Player = {
       playerId: this.id,
-      userId: this.authenticatedUser.id,
+      userId,
       spaceId,
-      displayName: payload.displayName?.trim() || this.authenticatedUser.name || "Player",
+      displayName,
       avatarId: payload.avatarId,
       character: payload.character,
       x: Math.min(spawnX, width - 24),
@@ -127,10 +135,6 @@ export class User {
           const authenticatedUser = await this.authenticatedUserPromise;
           if (authenticatedUser) this.authenticatedUser = authenticatedUser;
         }
-        if (!this.authenticatedUser) {
-          this.ws.close(1008, "Unauthorized");
-          return;
-        }
 
         const message = JSON.parse(data.toString()) as {
           type?: string;
@@ -139,7 +143,7 @@ export class User {
 
         switch (message.type) {
           case "join":
-            console.log(`[ws] join received from ${this.authenticatedUser.id}`);
+            console.log(`[ws] join received; user=${this.authenticatedUser?.name || "guest"}`);
             await this.join((message.payload ?? {}) as JoinPayload);
             break;
           case "move":
